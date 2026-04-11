@@ -60,6 +60,7 @@
                             </div>
                             <div class="task-meta">
                                 <span>{{ t.deadline or t.due_date or 'TBD' }}</span>
+                                <span>Assignee: {{ t.owner or 'Unassigned' }}</span>
                                 <span class="badge {{ t.priority }}">{{ (t.priority or 'medium').upper() }}</span>
                             </div>
                         </div>
@@ -96,6 +97,7 @@
                                     </div>
                                     <div class="task-meta">
                                         <span>{{ t.deadline or t.due_date or 'TBD' }}</span>
+                                        <span>Assignee: {{ t.owner or 'Unassigned' }}</span>
                                         <span class="badge {{ t.priority }}">{{ (t.priority or 'medium').upper() }}</span>
                                     </div>
                                 </div>

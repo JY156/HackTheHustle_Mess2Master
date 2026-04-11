@@ -1,6 +1,8 @@
 import os
 import json
 import time
+import re
+from datetime import date, timedelta
 from io import BytesIO
 from PyPDF2 import PdfReader
 from google import genai
@@ -51,12 +53,14 @@ class Mess2MasterAI:
         # === File Processing: PDF Text Extraction + Multimodal Fallback ===
         for file in files:
             try:
-                ext = file.filename.rsplit('.', 1)[-1].lower()
-                mime = mime_map.get(ext, 'application/octet-stream')
+                filename = getattr(file, "filename", "") or ""
+                ext = filename.rsplit('.', 1)[-1].lower() if "." in filename else ""
+                mime = getattr(file, "mimetype", None) or mime_map.get(ext, 'application/octet-stream')
                 file_bytes = file.read()
+                is_pdf = (ext == 'pdf') or (mime == 'application/pdf')
 
                 # Special handling for PDFs: extract text first (better for task extraction)
-                if ext == 'pdf':
+                if is_pdf:
                     try:
                         pdf_reader = PdfReader(BytesIO(file_bytes))
                         extracted_pages = []
@@ -78,7 +82,7 @@ class Mess2MasterAI:
                         # Fallback: send raw PDF bytes for Gemini's native PDF understanding
 
                 # Truncate large non-PDF files to avoid token limits
-                if ext != 'pdf' and len(file_bytes) > 2_000_000:
+                if not is_pdf and len(file_bytes) > 2_000_000:
                     file_bytes = file_bytes[:2_000_000]
 
                 contents.append(types.Part.from_bytes(data=file_bytes, mime_type=mime))
@@ -176,6 +180,10 @@ class Mess2MasterAI:
                         task["deadline"] = task.get("deadline") or task.get("due_date")  # Field name compatibility
                         if not task.get("due_date_source"):
                             task["due_date_source"] = "suggested" if task.get("deadline") else "null"
+
+                    # Voice meeting notes often need more deterministic splitting than the model gives.
+                    heuristic_tasks = self._extract_tasks_from_notes(notes, sem_start)
+                    parsed["tasks"] = self._merge_task_lists(parsed["tasks"], heuristic_tasks)
                     
                     parsed["_meta"] = diagnostics
                     return parsed
@@ -188,36 +196,229 @@ class Mess2MasterAI:
                 # Stop on quota errors (don't waste retries)
                 if "429" in error_text or "RESOURCE_EXHAUSTED" in error_text or "spending cap" in error_text.lower():
                     diagnostics["used_model"] = model_name
-                    return self._fallback(sem_start, reason=error_text, diagnostics=diagnostics)
+                    return self._fallback(sem_start, notes=notes, reason=error_text, diagnostics=diagnostics)
                 # Continue to next model on 404/not found
                 if "404" in error_text or "NOT_FOUND" in error_text or "no longer available" in error_text:
                     continue
 
         # All models failed → fallback
         print(f"❌ AI Error after trying {tried_models}: {last_error}")
-        return self._fallback(sem_start, reason=str(last_error), diagnostics=diagnostics)
+        return self._fallback(sem_start, notes=notes, reason=str(last_error), diagnostics=diagnostics)
 
-    def _fallback(self, sem_start, reason=None, diagnostics=None):
-        """Graceful fallback that returns valid JSON structure"""
-        ts = int(time.time())
-        payload = {
-            "project_name": "Demo Project",
-            "tasks": [{
+    def _fallback(self, sem_start, notes="", reason=None, diagnostics=None):
+        """Graceful fallback that still extracts practical tasks from plain transcript text."""
+        extracted = self._extract_tasks_from_notes(notes, sem_start)
+        if not extracted:
+            ts = int(time.time())
+            extracted = [{
                 "id": f"ts_{ts}",
-                "title": "Setup Project Repository",
-                "description": "Initialize git and README",
+                "title": "Review meeting transcript and assign owners",
+                "description": "AI fallback mode could not parse clear action lines. Confirm owners and deadlines manually.",
                 "deadline": sem_start,
-                "due_date_source": "explicit",
+                "due_date_source": "suggested",
                 "priority": "high",
                 "status": "pending",
-                "owner": "Team Lead",
-                "follow_up": "Confirm repository name and assign first owner"
-            }],
-            "gaps": [{"issue": "Missing methodology section", "suggestion": "Schedule 1hr meeting to align on approach"}],
-            "sync_score": 75,
-            "cross_insights": ["Reuse literature review template from previous course"]
+                "owner": None,
+                "follow_up": "Share one sentence per task: Owner + Action + Date"
+            }]
+
+        payload = {
+            "project_name": "Mess2Master Fallback",
+            "tasks": extracted[:10],
+            "gaps": [{"issue": "Some tasks may still miss clear owners/dates", "suggestion": "Add explicit 'Owner + by Date' phrasing for each action item"}],
+            "sync_score": 70,
+            "cross_insights": ["Fallback parsing used transcript-only extraction due to model unavailability"]
         }
         payload["_meta"] = diagnostics or {}
         payload["_meta"]["fallback"] = True
         payload["_meta"]["fallback_reason"] = reason or "All models failed"
         return payload
+
+    def _extract_tasks_from_notes(self, notes: str, sem_start: str) -> list:
+        text = (notes or "").strip()
+        if not text:
+            return []
+
+        default_year = self._year_from_sem_start(sem_start)
+        normalized = re.sub(r"\s+", " ", text)
+        normalized = re.sub(r"(?i)\b(next|also|wait|first|then|finally|meanwhile|additionally|and also|oh and)\b", r". \1", normalized)
+        normalized = re.sub(
+            r"\s+(?=[A-Z][a-z]+(?:,)?\s+(?:can you|please|you'll|you have|you've|you can|we need|we have|take|draft|design|write|prepare|check|confirm|handle|since))",
+            ". ",
+            normalized,
+        )
+        clauses = [c.strip(" \t\n\"'") for c in re.split(r"(?<=[.!?])\s+", normalized) if c.strip()]
+        tasks = []
+        seen = set()
+        last_task = None
+
+        for clause in clauses:
+            owner = None
+            action = None
+            deadline_iso = None
+            due_source = "null"
+
+            m_owner = re.search(
+                r"\b(?P<owner>[A-Z][a-z]+)(?:,)?\s*(?:since[^,]*,?\s*)?(?:can you|please|you(?:'ll| will)|you've[^,]*,?\s*so please|you have|you can|take|draft|design|write|prepare|check|confirm|handle)\s+(?P<action>.+)",
+                clause,
+                flags=re.IGNORECASE,
+            )
+            if m_owner:
+                owner = m_owner.group("owner")
+                action = m_owner.group("action")
+
+                # "Sarah, can you handle that" should assign previous open task owner.
+                if action and re.fullmatch(r"(?:handle|take|do)?(?:\s+(?:that|this|it|the same))?[?.!]*", action.strip(), flags=re.IGNORECASE):
+                    if last_task and not last_task.get("owner"):
+                        last_task["owner"] = owner
+                    continue
+
+            if not action:
+                m_need = re.search(r"\b(?:we need to|we have to|please)\s+(?P<action>.+)", clause, flags=re.IGNORECASE)
+                if m_need:
+                    action = m_need.group("action")
+
+            if not action and "peer evaluation" in clause.lower() and "due" in clause.lower():
+                action = "Submit peer evaluation forms"
+
+            if not action and ("haven't assigned anyone to" in clause.lower() or "not assigned" in clause.lower()):
+                m_gap = re.search(r"(?:haven't assigned anyone to|not assigned to)\s+(?P<action>.+)", clause, flags=re.IGNORECASE)
+                action = m_gap.group("action") if m_gap else clause
+
+            if not action:
+                # Allow standalone date clause to enrich previous task.
+                if last_task and not last_task.get("deadline"):
+                    inferred_date, inferred_source = self._extract_deadline(clause, default_year)
+                    if inferred_date:
+                        last_task["deadline"] = inferred_date
+                        last_task["due_date_source"] = inferred_source
+                continue
+
+            deadline_iso, due_source = self._extract_deadline(clause, default_year)
+
+            # Clean up trailing chatter that is not part of the action
+            action = re.sub(r"\b(?:by|before|due|deadline)\b.+$", "", action, flags=re.IGNORECASE).strip(" .,")
+            action = re.sub(r"\b(?:that|soon|should work)\b$", "", action, flags=re.IGNORECASE).strip(" .,")
+            action = re.sub(r"\b(?:i'?m|we should|let'?s|okay that'?s it|that'?s it|but no one'?s assigned.*|wait|also|oh and).*$", "", action, flags=re.IGNORECASE).strip(" .,")
+            if not action:
+                continue
+
+            action_variants = self._split_compound_action(action)
+            for variant in action_variants:
+                title = self._title_from_action(variant)
+                dedupe_key = (title.lower(), (deadline_iso or ""), (owner or "").lower())
+                if dedupe_key in seen:
+                    continue
+                seen.add(dedupe_key)
+
+                task = {
+                    "id": f"ts_{int(time.time())}_{len(tasks)}",
+                    "title": title,
+                    "description": variant,
+                    "deadline": deadline_iso,
+                    "due_date_source": due_source,
+                    "priority": "high" if deadline_iso else "medium",
+                    "status": "pending",
+                    "owner": owner,
+                    "follow_up": None if owner else "Assign owner"
+                }
+                tasks.append(task)
+                last_task = task
+
+        return tasks
+
+    def _split_compound_action(self, action: str) -> list[str]:
+        text = re.sub(r"\s+", " ", (action or "")).strip(" .,")
+        if not text:
+            return []
+
+        if re.search(r"\bor\b", text, flags=re.IGNORECASE):
+            parts = [part.strip(" .,") for part in re.split(r"\bor\b", text, flags=re.IGNORECASE) if part.strip()]
+            if len(parts) >= 2 and all(len(part) >= 4 for part in parts):
+                return parts
+
+        return [text]
+
+    def _merge_task_lists(self, primary_tasks: list, secondary_tasks: list) -> list:
+        merged = []
+        seen = set()
+
+        for source in (primary_tasks or [], secondary_tasks or []):
+            for task in source:
+                title = self._title_from_action(str(task.get("title") or task.get("description") or ""))
+                deadline = task.get("deadline") or task.get("due_date") or ""
+                owner = (task.get("owner") or "").strip().lower()
+                key = (title.lower(), deadline, owner)
+                if key in seen:
+                    continue
+                seen.add(key)
+
+                normalized = dict(task)
+                normalized["title"] = title
+                normalized["deadline"] = normalized.get("deadline") or normalized.get("due_date")
+                normalized["status"] = "pending"
+                if not normalized.get("due_date_source"):
+                    normalized["due_date_source"] = "suggested" if normalized.get("deadline") else "null"
+                merged.append(normalized)
+
+        return merged
+
+    def _extract_deadline(self, text: str, default_year: int):
+        month_pattern = re.search(
+            r"\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s*(\d{4}))?",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if month_pattern:
+            month_name = month_pattern.group(1).lower()
+            day = int(month_pattern.group(2))
+            year = int(month_pattern.group(3)) if month_pattern.group(3) else default_year
+            month = {
+                "january": 1, "february": 2, "march": 3, "april": 4,
+                "may": 5, "june": 6, "july": 7, "august": 8,
+                "september": 9, "october": 10, "november": 11, "december": 12,
+            }[month_name]
+            try:
+                return date(year, month, day).isoformat(), "explicit"
+            except ValueError:
+                return None, "null"
+
+        mid_month = re.search(r"\bmid[-\s]+(january|february|march|april|may|june|july|august|september|october|november|december)\b", text, flags=re.IGNORECASE)
+        if mid_month:
+            month_name = mid_month.group(1).lower()
+            month = {
+                "january": 1, "february": 2, "march": 3, "april": 4,
+                "may": 5, "june": 6, "july": 7, "august": 8,
+                "september": 9, "october": 10, "november": 11, "december": 12,
+            }[month_name]
+            return date(default_year, month, 15).isoformat(), "suggested"
+
+        weekday_pattern = re.search(r"\b(?:this\s+)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b", text, flags=re.IGNORECASE)
+        if weekday_pattern and re.search(r"\b(by|before|due)\b", text, flags=re.IGNORECASE):
+            target_name = weekday_pattern.group(1).lower()
+            target_weekday = {
+                "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
+                "friday": 4, "saturday": 5, "sunday": 6,
+            }[target_name]
+            today = date.today()
+            delta = (target_weekday - today.weekday()) % 7
+            delta = 7 if delta == 0 else delta
+            return (today + timedelta(days=delta)).isoformat(), "suggested"
+
+        return None, "null"
+
+    def _title_from_action(self, action: str) -> str:
+        cleaned = re.sub(r"\s+", " ", action).strip(" .")
+        cleaned = cleaned[:120]
+        if not cleaned:
+            return "Untitled task"
+        if len(cleaned) <= 62:
+            return cleaned[0].upper() + cleaned[1:]
+        short = cleaned[:62].rsplit(" ", 1)[0].strip()
+        return (short or cleaned[:62]) + "..."
+
+    def _year_from_sem_start(self, sem_start: str) -> int:
+        try:
+            return int((sem_start or "")[:4])
+        except Exception:
+            return date.today().year

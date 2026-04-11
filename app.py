@@ -211,6 +211,7 @@ def process_upload():
             "status": "success",
             "project_name": project_name,
             "fallback": result.get("_meta", {}).get("fallback", False),
+            "fallback_reason": result.get("_meta", {}).get("fallback_reason"),
             "used_model": result.get("_meta", {}).get("used_model"),
             "pdf_extracted": result.get("_meta", {}).get("pdf_text_extracted", False)
         })

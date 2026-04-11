@@ -380,7 +380,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         let interim = '';
         for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript;
-        if (event.results[i].isFinal) fullTranscript += transcript + ' ';
+        if (event.results[i].isFinal) {
+            const sentence = transcript.trim().replace(/[.?!]+$/, '');
+            fullTranscript += `${sentence}. `;
+        }
         else interim = transcript;
         }
         liveTranscript.innerHTML = `<strong>Transcript:</strong> ${fullTranscript}<br><em style="color: var(--text-muted);">Listening: ${interim}</em>`;
