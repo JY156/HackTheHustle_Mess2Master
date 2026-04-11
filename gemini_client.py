@@ -87,13 +87,17 @@ class Mess2MasterAI:
         Return strict JSON only with this shape:
         {{
           "project_name": "string",
-          "tasks": [{{"title":"string","description":"string","due_date":"YYYY-MM-DD or null","priority":"high|medium|low","owner":"string or null"}}],
+                    "tasks": [{{"title":"string","description":"string","due_date":"YYYY-MM-DD or null","due_date_source":"explicit|suggested|null","priority":"high|medium|low","owner":"string or null","follow_up":"string or null"}}],
           "gaps": [{{"issue":"string","suggestion":"string"}}],
           "sync_score": 0,
           "cross_insights": ["string"]
         }}
 
-        Keep it short. Prefer 3 to 6 tasks.
+                Keep it short. Prefer 3 to 6 tasks.
+                If files are uploaded, make each task description more specific and readable, using 1 to 3 short sentences.
+                Prefer task titles that closely match the user's wording or the uploaded brief wording. Avoid generic titles unless the input is very vague.
+                If a deadline is not explicitly stated in the file, provide a suggested due date and mark due_date_source as "suggested".
+                If you can infer a follow-up action, include it in follow_up as a short practical sentence.
         """
 
         last_error = None
@@ -146,7 +150,7 @@ class Mess2MasterAI:
     def _fallback(self, sem_start, reason=None, diagnostics=None):
         payload = {
             "project_name": "Demo Project",
-            "tasks": [{"title": "Setup Project Repository", "description": "Initialize git and README", "due_date": sem_start, "priority": "high", "owner": "Team Lead"}],
+            "tasks": [{"title": "Setup Project Repository", "description": "Initialize git and README", "due_date": sem_start, "due_date_source": "explicit", "priority": "high", "owner": "Team Lead", "follow_up": "Confirm repository name and assign the first owner."}],
             "gaps": [{"issue": "Missing methodology section", "suggestion": "Schedule 1hr meeting to align on approach"}],
             "sync_score": 75,
             "cross_insights": ["Reuse literature review template from previous course"]
