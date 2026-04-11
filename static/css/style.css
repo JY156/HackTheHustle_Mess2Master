@@ -441,3 +441,23 @@ button[type="submit"]:disabled, .btn-primary:disabled, .btn-sync-notion:disabled
     color: white;
     border-color: var(--primary-hover);
 }
+
+/* === Privacy Modal === */
+.modal-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center; z-index: 1000;
+}
+.modal-content {
+    background: var(--surface); padding: 2rem; border-radius: var(--radius);
+    max-width: 450px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.25);
+    text-align: center; border: 1px solid var(--border);
+}
+.modal-content h3 { margin-bottom: 1rem; color: var(--primary); display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
+.modal-content ul { padding-left: 1.2rem; }
+.btn-sm { padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; font-weight: 600; transition: 0.2s; }
+.btn-sm:hover { background: var(--border); }
+
+/* === Recording Animation === */
+@keyframes pulse-red { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+.recording-dot { display: inline-block; width: 10px; height: 10px; background: var(--danger); border-radius: 50%; margin-right: 0.5rem; animation: pulse-red 1s infinite; vertical-align: middle; }

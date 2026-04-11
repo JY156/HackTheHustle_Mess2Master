@@ -20,6 +20,43 @@
     </nav>
 
     <main class="container">
+        <!-- Privacy Consent Modal -->
+        <div id="privacyModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h3><i class="fas fa-shield-alt"></i> Privacy & Consent</h3>
+            <p>Mess2Master uses your browser's built-in speech recognition. Your voice is <strong>processed locally in your browser</strong> and <strong>never uploaded or stored</strong> on our servers.</p>
+            <ul style="text-align: left; margin: 1rem 0; color: var(--text-muted); font-size: 0.9rem;">
+            <li>🔒 Audio stays in your browser session</li>
+            <li>🚫 No recording saved to disk or cloud</li>
+            <li>✅ Live transcription sent directly to AI for task extraction</li>
+            </ul>
+            <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+            <button id="agreePrivacy" class="btn-primary" style="flex: 1;">I Agree, Start Listening</button>
+            <button id="cancelPrivacy" class="btn-sm" style="flex: 1; background: var(--surface); border: 1px solid var(--border); color: var(--text);">Cancel</button>
+            </div>
+        </div>
+        </div>
+
+        <!-- Voice Meeting Card -->
+        <section class="card voice-section" style="margin-bottom: 1.5rem; background: linear-gradient(135deg, rgba(108,92,231,0.05), rgba(162,155,254,0.05)); border: 2px dashed var(--primary);">
+        <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+            <div style="background: rgba(108,92,231,0.1); padding: 0.75rem; border-radius: 50%;">
+            <i class="fas fa-microphone" style="font-size: 1.5rem; color: var(--primary);"></i>
+            </div>
+            <div style="flex: 1; min-width: 200px;">
+            <h3 style="margin: 0 0 0.25rem;">Voice Meeting Notes</h3>
+            <p style="margin: 0; font-size: 0.9rem; color: var(--text-muted);">Click to start recording your discussion. AI will extract tasks instantly.</p>
+            </div>
+            <button id="startVoiceBtn" class="btn-primary" style="width: auto; padding: 0.6rem 1.2rem;">
+            <i class="fas fa-microphone"></i> Start Listening
+            </button>
+            <button id="stopVoiceBtn" class="btn-primary" style="width: auto; padding: 0.6rem 1.2rem; background: var(--danger); display: none;">
+            <i class="fas fa-stop"></i> Stop & Extract
+            </button>
+        </div>
+        <div id="voiceStatus" style="margin-top: 1rem; font-size: 0.9rem; color: var(--text-muted); min-height: 1.5rem;"></div>
+        <div id="liveTranscript" style="margin-top: 0.5rem; padding: 0.75rem; background: var(--surface); border-radius: 8px; max-height: 120px; overflow-y: auto; display: none; font-size: 0.9rem;"></div>
+        </section>
         <!-- Semester Setup Banner (shown only if not configured) -->
         <div id="semesterBanner" class="card semester-banner" style="display: none;">
             <h3><i class="fas fa-calendar-week"></i> Setup Your Semester</h3>

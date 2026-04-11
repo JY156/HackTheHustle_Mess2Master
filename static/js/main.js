@@ -329,4 +329,136 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
     });
+
+    // === Voice Feature with Privacy Flow ===
+    const privacyModal = document.getElementById('privacyModal');
+    const startVoiceBtn = document.getElementById('startVoiceBtn');
+    const stopVoiceBtn = document.getElementById('stopVoiceBtn');
+    const agreePrivacy = document.getElementById('agreePrivacy');
+    const cancelPrivacy = document.getElementById('cancelPrivacy');
+    const voiceStatus = document.getElementById('voiceStatus');
+    const liveTranscript = document.getElementById('liveTranscript');
+
+    let recognition = null;
+    let isRecording = false;
+    let fullTranscript = '';
+    let hasAgreedPrivacy = sessionStorage.getItem('voicePrivacyAgreed') === 'true';
+
+    // 1. Privacy Modal Handlers
+    if (startVoiceBtn && privacyModal) {
+    startVoiceBtn.addEventListener('click', () => {
+        if (!hasAgreedPrivacy) {
+        privacyModal.style.display = 'flex';
+        } else {
+        startRecording();
+        }
+    });
+    }
+
+    if (agreePrivacy) {
+    agreePrivacy.addEventListener('click', () => {
+        hasAgreedPrivacy = true;
+        sessionStorage.setItem('voicePrivacyAgreed', 'true');
+        privacyModal.style.display = 'none';
+        startRecording();
+    });
+    }
+
+    if (cancelPrivacy) {
+    cancelPrivacy.addEventListener('click', () => privacyModal.style.display = 'none');
+    }
+
+    // 2. Web Speech API Setup
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+    recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = (event) => {
+        let interim = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) fullTranscript += transcript + ' ';
+        else interim = transcript;
+        }
+        liveTranscript.innerHTML = `<strong>Transcript:</strong> ${fullTranscript}<br><em style="color: var(--text-muted);">Listening: ${interim}</em>`;
+        liveTranscript.scrollTop = liveTranscript.scrollHeight;
+    };
+
+    recognition.onerror = (event) => {
+        console.error('Speech error:', event.error);
+        voiceStatus.innerHTML = `<span style="color: var(--danger);">❌ ${event.error}. Try again.</span>`;
+        stopRecordingUI();
+    };
+
+    recognition.onend = () => { if (isRecording) recognition.start(); };
+    } else {
+    voiceStatus.innerHTML = '⚠️ Voice not supported. Please use Chrome or Edge.';
+    if (startVoiceBtn) startVoiceBtn.disabled = true;
+    }
+
+    // 3. Recording Controls
+    function startRecording() {
+    if (!recognition) return;
+    fullTranscript = '';
+    isRecording = true;
+    recognition.start();
+    startVoiceBtn.style.display = 'none';
+    stopVoiceBtn.style.display = 'inline-flex';
+    voiceStatus.innerHTML = '<span class="recording-dot"></span> Recording... Speak clearly. AI is listening.';
+    liveTranscript.style.display = 'block';
+    liveTranscript.innerHTML = '<em>Listening...</em>';
+    }
+
+    function stopRecordingUI() {
+    isRecording = false;
+    stopVoiceBtn.style.display = 'none';
+    startVoiceBtn.style.display = 'inline-flex';
+    }
+
+    if (stopVoiceBtn) {
+    stopVoiceBtn.addEventListener('click', async () => {
+        if (!recognition) return;
+        recognition.stop();
+        stopRecordingUI();
+        voiceStatus.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Extracting tasks from conversation...';
+        
+        if (fullTranscript.trim().length > 30) {
+        await processVoiceTranscript(fullTranscript);
+        } else {
+        voiceStatus.innerHTML = '⚠️ Too short. Try speaking more.';
+        liveTranscript.style.display = 'none';
+        }
+    });
+    }
+
+    // 4. Send to Backend
+    async function processVoiceTranscript(transcript) {
+    try {
+        const formData = new FormData();
+        formData.append('notes', `Voice meeting transcript:\n${transcript}`);
+        
+        const projSelect = document.getElementById('projectSelect');
+        const newProjInput = document.getElementById('newProjectInput');
+        const projectName = (newProjInput?.value?.trim()) || (projSelect?.value) || 'Voice Meeting';
+        formData.append('project_name', projectName);
+        formData.append('sem_start', document.querySelector('input[name="sem_start"]')?.value || '2026-01-12');
+        formData.append('sem_end', document.querySelector('input[name="sem_end"]')?.value || '2026-05-15');
+
+        const res = await fetch('/process', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (data.status === 'success') {
+        voiceStatus.innerHTML = '✅ Tasks extracted! Refreshing view...';
+        setTimeout(() => window.location.reload(), 1500);
+        } else {
+        voiceStatus.innerHTML = `❌ ${data.error || 'Processing failed'}`;
+        }
+    } catch (err) {
+        console.error(err);
+        voiceStatus.innerHTML = `❌ Network error: ${err.message}`;
+    }
+    }
 });
