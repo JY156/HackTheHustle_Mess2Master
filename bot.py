@@ -1,5 +1,6 @@
 import os
 import re
+import json
 from html import escape as html_escape
 from io import BytesIO
 from datetime import date
@@ -39,11 +40,68 @@ STRONG_SIGNAL_WORDS = ["due", "by", "friday", "monday", "assign", "need to", "fi
 TASK_SPLIT_RE = re.compile(r"\s+(?:and also|also|and then|plus|,\s+and|;|\.|\n)\s+", re.I)
 
 
+def normalize_alias_key(value: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", (value or "").lower())
+
+
+def load_assignee_aliases() -> dict[str, str]:
+    raw = (os.getenv("ASSIGNEE_ALIASES") or "").strip()
+    aliases = {}
+    if not raw:
+        return aliases
+
+    if raw.startswith("{") and raw.endswith("}"):
+        try:
+            obj = json.loads(raw)
+            if isinstance(obj, dict):
+                for k, v in obj.items():
+                    key = normalize_alias_key(str(k))
+                    val = str(v).strip()
+                    if key and val:
+                        aliases[key] = val if val.startswith("@") else f"@{val}"
+                return aliases
+        except Exception:
+            pass
+
+    parts = [p.strip() for p in re.split(r"[;|]", raw) if p.strip()]
+    for part in parts:
+        if "=" in part:
+            left, right = part.split("=", 1)
+        elif ":" in part:
+            left, right = part.split(":", 1)
+        else:
+            continue
+        key = normalize_alias_key(left)
+        val = right.strip()
+        if key and val:
+            aliases[key] = val if val.startswith("@") else f"@{val}"
+    return aliases
+
+
+ASSIGNEE_ALIASES = load_assignee_aliases()
+
+
+def resolve_assignee(name: str) -> str:
+    clean = (name or "").strip().rstrip(".,;:!? ")
+    if not clean:
+        return clean
+    if clean.startswith("@"):
+        return clean
+    alias = ASSIGNEE_ALIASES.get(normalize_alias_key(clean))
+    if alias:
+        return alias
+    # If not mapped and it's a single token, treat as a potential Telegram handle.
+    if " " not in clean:
+        return f"@{clean}"
+    return clean
+
+
 class InMemoryUpload:
     """Minimal file-like wrapper compatible with Mess2MasterAI.extract_tasks."""
 
-    def __init__(self, filename: str, data: bytes):
+    def __init__(self, filename: str, data: bytes, mimetype: str | None = None):
         self.filename = filename
+        self.mimetype = mimetype
         self.stream = BytesIO(data)
 
     def read(self):
@@ -215,6 +273,114 @@ def extract_tasks_from_message(message_text: str, default_owner: str) -> list[di
     return tasks
 
 
+def parse_owner_from_text(text: str) -> str | None:
+    m = re.search(r"(?:assign(?:ed)?(?:\s+to)?|owner(?:\s+is)?|for)\s+(@?[A-Za-z0-9_][A-Za-z0-9_\s]{0,40})", text, flags=re.I)
+    if m:
+        name = m.group(1).strip().rstrip(".,;:!? ")
+        return resolve_assignee(name)
+    return None
+
+
+def looks_like_followup(text: str) -> bool:
+    lowered = (text or "").lower().strip()
+    patterns = [
+        r"^\d+\.",
+        r"->\s*@?[a-z0-9_]+",
+        r"\bassign\b",
+        r"\bowner\b",
+        r"\bdue\b",
+        r"\bdeadline\b",
+        r"\bmove\b",
+        r"\bchange\b",
+    ]
+    return any(re.search(p, lowered) for p in patterns)
+
+
+def should_show_details(task: dict) -> bool:
+    title = (task.get("title") or "").strip()
+    desc = (task.get("description") or "").strip()
+    if not desc:
+        return False
+
+    title_norm = re.sub(r"\W+", " ", title).strip().lower()
+    desc_norm = re.sub(r"\W+", " ", desc).strip().lower()
+    desc_norm = re.sub(r"^(we have to|we need to|need to|please|kindly)\s+", "", desc_norm)
+    if not title_norm:
+        return len(desc) > 20
+
+    if desc_norm == title_norm:
+        return False
+    if desc_norm.startswith(title_norm) and len(desc_norm) <= len(title_norm) + 32:
+        return False
+    return True
+
+
+def apply_followup_updates(text: str, tasks: list[dict]) -> bool:
+    if not text or not tasks:
+        return False
+
+    lowered = text.lower()
+    changed = False
+
+    # Example: "task 2 assign to lily" or "2 to lily"
+    indexed_owner = re.search(r"(?:task\s*)?(\d+)\D{0,20}(?:assign(?:ed)?(?:\s+to)?|owner(?:\s+is)?|to)\s+(@?[A-Za-z0-9_][A-Za-z0-9_\s]{0,40})", text, flags=re.I)
+    if indexed_owner:
+        idx = int(indexed_owner.group(1)) - 1
+        if 0 <= idx < len(tasks):
+            owner_raw = indexed_owner.group(2).strip().rstrip(".,;:!? ")
+            tasks[idx]["owner"] = resolve_assignee(owner_raw)
+            changed = True
+
+    # Example: "1. Submit slide -> SynYee"
+    arrow_owner = re.search(r"^\s*(\d+)\D{0,80}->\s*(@?[A-Za-z0-9_][A-Za-z0-9_\s]{0,40})\s*$", text, flags=re.I)
+    if arrow_owner:
+        idx = int(arrow_owner.group(1)) - 1
+        if 0 <= idx < len(tasks):
+            owner_raw = arrow_owner.group(2).strip().rstrip(".,;:!? ")
+            tasks[idx]["owner"] = resolve_assignee(owner_raw)
+            changed = True
+
+    # Example: "assign all to lily"
+    all_owner = re.search(r"assign\s+(?:all|everyone|all tasks?)\s+to\s+(@?[A-Za-z0-9_][A-Za-z0-9_\s]{0,40})", text, flags=re.I)
+    if all_owner:
+        owner_raw = all_owner.group(1).strip().rstrip(".,;:!? ")
+        owner = resolve_assignee(owner_raw)
+        for task in tasks:
+            task["owner"] = owner
+        changed = True
+
+    fallback_owner = parse_owner_from_text(text)
+    if fallback_owner and not (indexed_owner or all_owner):
+        # Apply to first task by default if user provides only one owner in free text.
+        tasks[0]["owner"] = fallback_owner
+        changed = True
+
+    # Example: "task 2 deadline monday 5pm"
+    indexed_due = re.search(r"(?:task\s*)?(\d+).{0,30}(?:deadline|due|by)\s+(.+)$", text, flags=re.I)
+    if indexed_due:
+        idx = int(indexed_due.group(1)) - 1
+        due_phrase = indexed_due.group(2)
+        due_date = infer_due_date(due_phrase)
+        due_time = infer_due_time(due_phrase)
+        if 0 <= idx < len(tasks) and due_date:
+            tasks[idx]["due_date"] = f"{due_date} {due_time}" if due_time else due_date
+            tasks[idx]["due_date_source"] = "explicit"
+            changed = True
+
+    # Example: "move deadline to friday 2pm" applies to first task by default.
+    global_due = re.search(r"(?:deadline|due|by)\s+(.+)$", text, flags=re.I)
+    if global_due and not indexed_due:
+        due_phrase = global_due.group(1)
+        due_date = infer_due_date(due_phrase)
+        due_time = infer_due_time(due_phrase)
+        if due_date:
+            tasks[0]["due_date"] = f"{due_date} {due_time}" if due_time else due_date
+            tasks[0]["due_date_source"] = "explicit"
+            changed = True
+
+    return changed
+
+
 def estimate_confidence(result: dict, notes: str) -> float:
     tasks = result.get("tasks", [])
     if not tasks:
@@ -249,7 +415,7 @@ def has_strong_signal(text: str) -> bool:
 
 
 def to_calendar_url(task: dict) -> str:
-    title = quote(task.get("title") or "ProjectPulse Task")
+    title = quote(task.get("title") or "Mess2Master Task")
     due = task.get("due_date") or date.today().isoformat()
     if " " in due:
         date_part, time_part = due.split(" ", 1)
@@ -261,7 +427,7 @@ def to_calendar_url(task: dict) -> str:
         end = start
     return (
         "https://calendar.google.com/calendar/render?action=TEMPLATE"
-        f"&text={title}&dates={start}/{end}&details=Task%20detected%20by%20ProjectPulse"
+        f"&text={title}&dates={start}/{end}&details=Task%20detected%20by%20Mess2Master"
     )
 
 
@@ -281,9 +447,9 @@ def build_actions_markup(task: dict) -> InlineKeyboardMarkup:
 
 
 def render_group_card(tasks: list[dict], source_text: str, username: str) -> str:
-    heading = "<b>✨ ProjectPulse: Task Detected</b>"
+    heading = "<b>✨ Mess2Master: Task Detected</b>"
     if len(tasks) > 1:
-        heading = f"<b>✨ ProjectPulse: {len(tasks)} Tasks Detected</b>"
+        heading = f"<b>✨ Mess2Master: {len(tasks)} Tasks Detected</b>"
     lines = [heading]
     for idx, task in enumerate(tasks, start=1):
         priority = (task.get("priority") or "medium").lower()
@@ -296,9 +462,9 @@ def render_group_card(tasks: list[dict], source_text: str, username: str) -> str
         lines.append("")
         lines.append(f"<b>{idx}. 📝 Task:</b> {title}")
         lines.append(f"<b>📅 Deadline:</b> {due}{html_escape(explain_due_date_source(task))}")
-        lines.append(f"<b>👤 Owner:</b> {owner}")
+        lines.append(f"<b>👤 Assignee:</b> {owner}")
         lines.append(f"<b>🎯 Priority:</b> {html_escape(priority.capitalize())} {icon}")
-        if description:
+        if should_show_details(task):
             lines.append(f"<b>🧾 Details:</b> {description}")
         if follow_up:
             lines.append(f"<b>🔁 Follow-up:</b> {follow_up}")
@@ -311,6 +477,16 @@ def render_group_card(tasks: list[dict], source_text: str, username: str) -> str
 
 
 def format_private_response(result: dict) -> str:
+    meta = result.get("_meta", {}) if isinstance(result, dict) else {}
+    if meta.get("fallback"):
+        reason = (meta.get("fallback_reason") or "Unknown AI error")
+        brief = shorten_text(reason, 220)
+        return (
+            "<b>Mess2Master could not analyze this file yet.</b>\n"
+            f"Reason: {html_escape(brief)}\n\n"
+            "Try PDF/TXT/DOCX, or add a short caption describing the assignment scope."
+        )
+
     tasks = result.get("tasks", [])[:3]
     if not tasks:
         return "I could not detect clear tasks yet. Add a due date and owner, or upload a brief."
@@ -345,9 +521,9 @@ def format_task_list_message(title: str, tasks: list[dict], source_text: str) ->
         lines.append("")
         lines.append(f"<b>{index}. 📝 Task:</b> {task_title}")
         lines.append(f"<b>📅 Deadline:</b> {due_value}{html_escape(explain_due_date_source(task))}")
-        lines.append(f"<b>👤 Owner:</b> {owner_value}")
+        lines.append(f"<b>👤 Assignee:</b> {owner_value}")
         lines.append(f"<b>🎯 Priority:</b> {html_escape(priority.capitalize())} {icon}")
-        if details:
+        if should_show_details(task):
             lines.append(f"<b>🧾 Details:</b> {details}")
         if follow_up:
             lines.append(f"<b>🔁 Follow-up:</b> {follow_up}")
@@ -383,13 +559,34 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     chat_type = (update.effective_chat.type if update.effective_chat else "private").lower()
     is_group_chat = chat_type in {"group", "supergroup"}
+    chat_id = update.effective_chat.id if update.effective_chat else None
+
+    # Follow-up mode: interpret normal replies as updates to the latest task card.
+    state = CHAT_STATE.get(chat_id) if chat_id else None
+    if state and apply_followup_updates(notes, state.get("tasks", [])):
+        state["task_keys"] = {task_key(task) for task in state["tasks"]}
+        await context.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=state["message_id"],
+            text=format_task_list_message("✨ Mess2Master: Task Updated", state["tasks"], notes),
+            parse_mode=ParseMode.HTML,
+            reply_markup=build_actions_markup(state["tasks"][0]),
+        )
+        if chat_id and message.message_id:
+            await set_reaction_safe(context, chat_id, message.message_id, "✅")
+        return
+
+    # If we already have an active card and this message looks like a follow-up,
+    # do not create new tasks from it.
+    if state and looks_like_followup(notes):
+        if chat_id and message.message_id:
+            await set_reaction_safe(context, chat_id, message.message_id, "✅")
+        return
 
     if is_group_chat:
         lowered = notes.lower()
         if not any(word in lowered for word in TRIGGERS):
             return
-
-    chat_id = update.effective_chat.id if update.effective_chat else None
     default_owner = f"@{message.from_user.username}" if message.from_user and message.from_user.username else "Unassigned"
     if chat_id and message.message_id:
         await set_reaction_safe(context, chat_id, message.message_id, "🧐")
@@ -436,7 +633,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.edit_message_text(
                     chat_id=chat_id,
                     message_id=state["message_id"],
-                    text=format_task_list_message("✨ ProjectPulse: Task Detected", state["tasks"], notes),
+                    text=format_task_list_message("✨ Mess2Master: Task Detected", state["tasks"], notes),
                     parse_mode=ParseMode.HTML,
                     reply_markup=build_actions_markup(state["tasks"][-1]),
                 )
@@ -446,7 +643,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return
 
             sent = await message.reply_text(
-                format_task_list_message("✨ ProjectPulse: Task Detected", tasks, notes),
+                format_task_list_message("✨ Mess2Master: Task Detected", tasks, notes),
                 parse_mode=ParseMode.HTML,
                 reply_markup=build_actions_markup(tasks[0]),
             )
@@ -474,7 +671,11 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         telegram_file = await context.bot.get_file(message.document.file_id)
         raw = await telegram_file.download_as_bytearray()
 
-        upload = InMemoryUpload(message.document.file_name or "upload.bin", bytes(raw))
+        upload = InMemoryUpload(
+            message.document.file_name or "upload.bin",
+            bytes(raw),
+            mimetype=message.document.mime_type,
+        )
         notes = message.caption or ""
 
         result = await build_ai_result(notes=notes, uploads=[upload])
@@ -518,7 +719,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         try:
             notion = NotionClient()
-            project_name = query.message.text.split("\n", 1)[0].replace("<b>", "").replace("</b>", "") if query.message.text else "ProjectPulse"
+            project_name = query.message.text.split("\n", 1)[0].replace("<b>", "").replace("</b>", "") if query.message.text else "Mess2Master"
             result = notion.sync_tasks(state["tasks"], project_name)
             if result.get("status") == "success":
                 await query.answer(f"Synced {result.get('synced_count', 0)} task(s) to Notion")

@@ -38,11 +38,13 @@ class Mess2MasterAI:
 
         for file in files:
             try:
-                ext = file.filename.rsplit('.', 1)[-1].lower()
-                mime = mime_map.get(ext, 'application/octet-stream')
+                filename = getattr(file, "filename", "") or ""
+                ext = filename.rsplit('.', 1)[-1].lower() if "." in filename else ""
+                mime = getattr(file, "mimetype", None) or mime_map.get(ext, 'application/octet-stream')
                 file_bytes = file.read()
+                is_pdf = (ext == 'pdf') or (mime == 'application/pdf')
 
-                if ext == 'pdf':
+                if is_pdf:
                     try:
                         pdf_reader = PdfReader(BytesIO(file_bytes))
                         if len(pdf_reader.pages) == 0:
@@ -64,7 +66,7 @@ class Mess2MasterAI:
                         print(f"⚠️ PDF text extraction failed for {file.filename}: {pdf_error}")
 
                 # Keep full PDF bytes; truncation can corrupt page structure.
-                if ext != 'pdf' and len(file_bytes) > 2_000_000:
+                if not is_pdf and len(file_bytes) > 2_000_000:
                     file_bytes = file_bytes[:2_000_000]
 
                 contents.append(types.Part.from_bytes(data=file_bytes, mime_type=mime))
@@ -149,7 +151,7 @@ class Mess2MasterAI:
 
     def _fallback(self, sem_start, reason=None, diagnostics=None):
         payload = {
-            "project_name": "Demo Project",
+            "project_name": "Mess2Master Fallback",
             "tasks": [{"title": "Setup Project Repository", "description": "Initialize git and README", "due_date": sem_start, "due_date_source": "explicit", "priority": "high", "owner": "Team Lead", "follow_up": "Confirm repository name and assign the first owner."}],
             "gaps": [{"issue": "Missing methodology section", "suggestion": "Schedule 1hr meeting to align on approach"}],
             "sync_score": 75,
