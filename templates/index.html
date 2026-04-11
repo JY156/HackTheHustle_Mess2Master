@@ -4,19 +4,54 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mess2Master | AI Project Intelligence</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=4">
+    <link rel="stylesheet" href="/static/css/style.css?v=6">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
     <nav class="navbar">
         <div class="nav-container">
             <a href="/" class="logo"><i class="fas fa-bolt"></i> Mess2Master</a>
-            <span class="badge">Hack The Hustle 2026</span>
+            <div class="nav-actions">
+                <a href="/tasks" class="nav-link"><i class="fas fa-list-check"></i> View All Tasks</a>
+                <button id="resetSemesterBtn" class="btn-reset" title="Start fresh semester"><i class="fas fa-rotate-right"></i></button>
+                <span class="badge">Hack The Hustle 2026</span>
+            </div>
         </div>
     </nav>
 
     <main class="container">
+        <!-- Semester Setup Banner (shown only if not configured) -->
+        <div id="semesterBanner" class="card semester-banner" style="display: none;">
+            <h3><i class="fas fa-calendar-week"></i> Setup Your Semester</h3>
+            <p class="banner-desc">Enter your semester dates once to enable smart deadline conversion (e.g., "Week 4" → exact date).</p>
+            <div class="semester-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Semester Start</label>
+                        <input type="date" id="semStart" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Semester End</label>
+                        <input type="date" id="semEnd" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Break Week</label>
+                        <select id="breakWeek">
+                            <option value="7">Week 7</option>
+                            <option value="8" selected>Week 8</option>
+                            <option value="9">Week 9</option>
+                        </select>
+                        <small>1-week break shifts later deadlines by +7 days</small>
+                    </div>
+                </div>
+                <button type="button" id="saveSemesterBtn" class="btn-primary">
+                    <i class="fas fa-check"></i> Save Semester Settings
+                </button>
+            </div>
+        </div>
+
         {% if not projects %}
+        <!-- Empty State: First Upload -->
         <section class="hero hero-empty">
             <h1>Focus &amp; Flow</h1>
             <p>Drop your project brief and notes. Mess2Master will turn it into actions in seconds.</p>
@@ -24,6 +59,29 @@
 
         <section class="card upload-panel upload-panel-hero">
             <form id="uploadForm" enctype="multipart/form-data">
+                
+                <!-- Project Selector -->
+                <div class="form-group">
+                    <label>Project Assignment</label>
+                    <div class="project-selector">
+                        <div style="flex: 1;">
+                            <label style="font-size: 0.75rem; margin-bottom: 0.2rem; color: var(--text-muted);">Select Existing</label>
+                            <select id="projectSelect" class="form-control">
+                                <option value="">-- None --</option>
+                                {% for name in project_names %}
+                                <option value="{{ name }}">{{ name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div style="flex: 1;">
+                            <label style="font-size: 0.75rem; margin-bottom: 0.2rem; color: var(--text-muted);">OR Create New</label>
+                            <input type="text" id="newProjectInput" class="form-control" placeholder="Type new project name...">
+                        </div>
+                    </div>
+                    <small id="projectHint" class="form-hint">Select existing to add more, or type a new name to create a project</small>
+                </div>
+
+                <!-- File Upload -->
                 <div class="drop-zone" id="dropZone">
                     <i class="fas fa-cloud-arrow-up"></i>
                     <p>Drop your project file to begin</p>
@@ -31,17 +89,7 @@
                     <span class="file-hint" id="fileList">Supports PDF, DOC, DOCX, TXT, MP3, WAV, M4A, OGG · up to 10 files</span>
                 </div>
 
-                <div class="form-row compact-row">
-                    <div class="form-group">
-                        <label>Semester Start</label>
-                        <input type="date" name="sem_start" value="2026-01-12" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Semester End</label>
-                        <input type="date" name="sem_end" value="2026-05-15" required>
-                    </div>
-                </div>
-
+                <!-- Notes -->
                 <div class="form-group">
                     <label>Meeting Notes / Chat Logs</label>
                     <textarea name="notes" rows="4" placeholder="Paste rough notes, roles, and deadlines..."></textarea>
@@ -51,33 +99,59 @@
                 <p id="submitStatus" class="submit-status" aria-live="polite"></p>
             </form>
         </section>
-        {% else %}
-        {% set p = projects[0] %}
 
+        {% else %}
+        <!-- Populated State: Show Semester + Most Recent Project Only -->
         <section class="hero">
-            <h1>{{ p.project_name }}</h1>
-            <p>Action Intelligence view. Focus on what to do now, what is missing, and your next sync action.</p>
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                <div>
+                    <h1>Current Focus</h1>
+                    <p style="color: var(--text-muted);">
+                        {% if semester.start and semester.end %}
+                            {{ semester.start[:4] }} • {{ (semester.end[:7] | replace('-', ' ')) }} Semester
+                        {% else %}
+                            Semester not configured
+                        {% endif %}
+                        • {{ projects|length }} project{% if projects|length > 1 %}s{% endif %}
+                    </p>
+                </div>
+                <a href="/tasks" class="btn-sm" style="display: inline-block; text-decoration: none;">
+                    View All Projects & Tasks →
+                </a>
+            </div>
         </section>
 
+        <!-- Upload Form: Add to Existing or Create New -->
         <section class="card upload-panel upload-panel-inline">
-            <h2><i class="fas fa-cloud-upload-alt"></i> Upload New Brief</h2>
+            <h2><i class="fas fa-cloud-upload-alt"></i> Add to Project</h2>
             <form id="uploadForm" enctype="multipart/form-data">
-                <div class="drop-zone" id="dropZone">
-                    <i class="fas fa-file-arrow-up"></i>
-                    <p>Drop a new file to refresh this plan</p>
-                    <input type="file" id="fileInput" name="files" multiple accept=".pdf,.doc,.docx,.txt,.mp3,.wav,.m4a,.ogg" style="display:none;">
-                    <span class="file-hint" id="fileList">Supports PDF, DOC, DOCX, TXT, MP3, WAV, M4A, OGG · up to 10 files</span>
+                
+                <!-- Project Selector: Defaults to "-- None --" -->
+                <div class="form-group">
+                    <label>Select Project or Create New</label>
+                    <div class="project-selector">
+                        <div style="flex: 1;">
+                            <label style="font-size: 0.75rem; margin-bottom: 0.2rem; color: var(--text-muted);">Add to Existing</label>
+                            <select id="projectSelect" class="form-control">
+                                <option value="">-- None --</option>
+                                {% for name in project_names %}
+                                <option value="{{ name }}">{{ name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div style="flex: 1;">
+                            <label style="font-size: 0.75rem; margin-bottom: 0.2rem; color: var(--text-muted);">OR Create New</label>
+                            <input type="text" id="newProjectInput" class="form-control" placeholder="Type new project name...">
+                        </div>
+                    </div>
+                    <small id="projectHint" class="form-hint">Select existing to add more, or type a new name to create a project</small>
                 </div>
 
-                <div class="form-row compact-row">
-                    <div class="form-group">
-                        <label>Semester Start</label>
-                        <input type="date" name="sem_start" value="2026-01-12" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Semester End</label>
-                        <input type="date" name="sem_end" value="2026-05-15" required>
-                    </div>
+                <div class="drop-zone" id="dropZone">
+                    <i class="fas fa-file-arrow-up"></i>
+                    <p>Drop a new file to update your plan</p>
+                    <input type="file" id="fileInput" name="files" multiple accept=".pdf,.doc,.docx,.txt,.mp3,.wav,.m4a,.ogg" style="display:none;">
+                    <span class="file-hint" id="fileList">Supports PDF, DOC, DOCX, TXT, MP3, WAV, M4A, OGG · up to 10 files</span>
                 </div>
 
                 <div class="form-group">
@@ -85,38 +159,48 @@
                     <textarea name="notes" rows="3" placeholder="Optional updates before regenerating plan..."></textarea>
                 </div>
 
-                <button type="submit" id="submitBtn"><i class="fas fa-wand-magic-sparkles"></i> Regenerate Plan</button>
+                <button type="submit" id="submitBtn"><i class="fas fa-wand-magic-sparkles"></i> Update Plan</button>
                 <p id="submitStatus" class="submit-status" aria-live="polite"></p>
             </form>
         </section>
 
+        <!-- Results: Show ONLY Most Recent Project's Tasks -->
         <section class="results-stack" id="projectsList">
-            <section class="card">
-                <h2><i class="fas fa-layer-group"></i> Action Intelligence</h2>
+            {% set recent = projects[-1] %}
+            <section class="card" id="{{ recent.project_name|replace(' ', '-') }}">
+                <div class="project-header">
+                    <h2><i class="fas fa-layer-group"></i> {{ recent.project_name }} <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 400;">(Most Recent)</span></h2>
+                    <div class="sync-badge {{ 'healthy' if recent.sync_score >= 70 else 'critical' }}">
+                        📊 Sync: {{ recent.sync_score }}%
+                    </div>
+                </div>
+                
                 <div class="priority-grid">
                     <div class="column">
-                        <h3>The To-Do</h3>
-                        <div class="task-list" id="masterList">
-                            {% if master_tasks %}
-                                {% for t in master_tasks %}
+                        <h3>The To-Do ({{ recent.pending_tasks|length }})</h3>
+                        <div class="task-list">
+                            {% if recent.pending_tasks %}
+                                {% for t in recent.pending_tasks[:5] %}
                                 <div class="task-item {{ t.priority }}">
                                     <div class="task-content">
                                         <div class="task-info">
-                                            <strong>{{ t.title }}</strong>
-                                            <small>{{ t.project }}</small>
+                                            <strong>{{ t.title or t.task }}</strong>
                                         </div>
                                         <div class="task-meta">
-                                            <span>{{ t.due_date or 'TBD' }}</span>
-                                            <span class="badge {{ t.priority }}">{{ t.priority.upper() }}</span>
+                                            <span>{{ t.deadline or t.due_date or 'TBD' }}</span>
+                                            <span class="badge {{ t.priority }}">{{ (t.priority or 'medium').upper() }}</span>
                                         </div>
                                     </div>
-                                    <button class="btn-calendar-icon" type="button" data-title="{{ t.title }}" data-date="{{ t.due_date }}" title="Add to Calendar">
+                                    <button class="btn-calendar-icon" type="button" data-title="{{ t.title or t.task }}" data-date="{{ t.deadline or t.due_date }}" title="Add to Calendar">
                                         <i class="fas fa-calendar-plus"></i>
                                     </button>
                                 </div>
                                 {% endfor %}
+                                {% if recent.pending_tasks|length > 5 %}
+                                <p class="empty-state"><a href="/tasks#{{ recent.project_name|replace(' ', '-') }}">View all {{ recent.pending_tasks|length }} tasks →</a></p>
+                                {% endif %}
                             {% else %}
-                                <p class="empty-state">No tasks extracted yet.</p>
+                                <p class="empty-state">All caught up! 🎉</p>
                             {% endif %}
                         </div>
                     </div>
@@ -124,39 +208,52 @@
                     <div class="column">
                         <h3>Key Risks</h3>
                         <div class="gaps-section">
-                            {% if p.gaps %}
-                                {% for g in p.gaps %}
+                            {% if recent.gaps %}
+                                {% for g in recent.gaps %}
                                 <div class="gap-item">
                                     <strong>⚠️ {{ g.issue }}</strong>
                                     <p>💡 {{ g.suggestion }}</p>
                                 </div>
                                 {% endfor %}
                             {% else %}
-                                <p class="empty-state">No key risks identified.</p>
+                                <p class="empty-state">No risks detected. Great job!</p>
+                            {% endif %}
+                        </div>
+
+                        <h3 style="margin-top: 1rem;">Insights</h3>
+                        <div class="insights-section">
+                            {% if recent.cross_insights %}
+                                {% for i in recent.cross_insights[:2] %}
+                                <p class="insight">• {{ i }}</p>
+                                {% endfor %}
+                            {% else %}
+                                <p class="empty-state">No insights yet.</p>
                             {% endif %}
                         </div>
                     </div>
                 </div>
-            </section>
 
-            <section class="card">
-                <h2><i class="fas fa-lightbulb"></i> Cross-Project Insights</h2>
-                <div class="insights-section">
-                    {% if p.cross_insights %}
-                        {% for i in p.cross_insights %}
-                        <p class="insight">• {{ i }}</p>
-                        {% endfor %}
-                    {% else %}
-                        <p class="empty-state">No insights available yet.</p>
-                    {% endif %}
-                </div>
-                <div class="sync-actions">
-                    <button id="syncNotionBtn" class="btn-sync-notion" type="button" title="Export all tasks to Notion">
-                        <i class="fas fa-database"></i> Sync to Notion
+                <!-- Sync to Notion Button -->
+                <div class="sync-actions" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+                    <button id="syncNotionBtn-recent" class="btn-sync-notion" type="button" data-project="{{ recent.project_name }}" style="margin-bottom: 0.5rem;">
+                        <i class="fas fa-database"></i> Sync {{ recent.project_name }} to Notion
                     </button>
-                    <p id="syncStatus" class="sync-status" aria-live="polite"></p>
+                    <p id="syncStatus-recent" class="sync-status" aria-live="polite"></p>
+                    <a href="/tasks#{{ recent.project_name|replace(' ', '-') }}" class="btn-sm" style="display: inline-block; text-decoration: none; margin-left: 0.5rem;">
+                        View Full Task Board →
+                    </a>
                 </div>
             </section>
+            
+            <!-- Link to View All Projects -->
+            {% if projects|length > 1 %}
+            <section class="card" style="text-align: center; padding: 2rem;">
+                <p style="color: var(--text-muted); margin-bottom: 1rem;">You have {{ projects|length - 1 }} other project{% if projects|length > 2 %}s{% endif %}</p>
+                <a href="/tasks" class="btn-primary" style="display: inline-block; text-decoration: none; width: auto; padding: 0.75rem 2rem;">
+                    View All Projects & Tasks →
+                </a>
+            </section>
+            {% endif %}
         </section>
         {% endif %}
     </main>
@@ -171,6 +268,6 @@
         </div>
     </footer>
 
-    <script src="/static/js/main.js?v=4"></script>
+    <script src="/static/js/main.js?v=6"></script>
 </body>
 </html>

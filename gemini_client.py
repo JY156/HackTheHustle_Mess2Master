@@ -14,13 +14,13 @@ class Mess2MasterAI:
         self.client = genai.Client(api_key=api_key)
         
         # ✅ Model fallback chain (Main's robustness)
-        primary = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+        self.model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
         self.model_fallbacks = [
-            primary,
-            "gemini-1.5-flash",
-            "models/gemini-1.5-flash", 
-            "gemini-1.0-pro",
-            "models/gemini-pro"
+            self.model,
+            "gemini-2.5-flash-lite",
+            "models/gemini-2.5-flash-lite",
+            "gemini-2.5-flash",
+            "models/gemini-2.5-flash",
         ]
 
     def extract_tasks(self, files: list, notes: str, sem_start: str, sem_end: str,

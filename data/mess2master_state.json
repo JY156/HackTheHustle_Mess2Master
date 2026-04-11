@@ -1,9 +1,139 @@
 {
   "semester": {
-    "start": "2026-01-12",
-    "end": "2026-05-15",
-    "break_week": 8,
-    "configured": false
+    "start": "2026-03-09",
+    "end": "2026-06-21",
+    "break_week": 8
   },
-  "projects": []
+  "projects": [
+    {
+      "project_name": "WIA2004 OS",
+      "pending_tasks": [
+        {
+          "id": "ts_1775900415",
+          "title": "Setup Project Repository",
+          "description": "Initialize git and README",
+          "deadline": "2026-03-09",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Team Lead",
+          "follow_up": "Confirm repository name and assign first owner"
+        },
+        {
+          "id": "ts_1775900529",
+          "title": "Setup Project Repository",
+          "description": "Initialize git and README",
+          "deadline": "2026-03-09",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Team Lead",
+          "follow_up": "Confirm repository name and assign first owner"
+        }
+      ],
+      "completed_tasks": [],
+      "gaps": [
+        {
+          "issue": "Missing methodology section",
+          "suggestion": "Schedule 1hr meeting to align on approach"
+        }
+      ],
+      "sync_score": 75,
+      "cross_insights": [
+        "Reuse literature review template from previous course"
+      ]
+    },
+    {
+      "project_name": "WIF2003 WP",
+      "pending_tasks": [
+        {
+          "id": "ts_1775901756",
+          "title": "Setup Project Repository",
+          "description": "Initialize git and README",
+          "deadline": "2026-03-09",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Team Lead",
+          "follow_up": "Confirm repository name and assign first owner"
+        },
+        {
+          "id": "ts_1775904170",
+          "title": "Setup Project Repository",
+          "description": "Initialize git and README",
+          "deadline": "2026-03-09",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Team Lead",
+          "follow_up": "Confirm repository name and assign first owner"
+        }
+      ],
+      "completed_tasks": [],
+      "gaps": [
+        {
+          "issue": "Missing methodology section",
+          "suggestion": "Schedule 1hr meeting to align on approach"
+        }
+      ],
+      "sync_score": 75,
+      "cross_insights": [
+        "Reuse literature review template from previous course"
+      ]
+    },
+    {
+      "project_name": "WIF2002 SRE",
+      "pending_tasks": [
+        {
+          "id": "ts_1775903508",
+          "title": "Setup Project Repository",
+          "description": "Initialize git and README",
+          "deadline": "2026-03-09",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Team Lead",
+          "follow_up": "Confirm repository name and assign first owner"
+        }
+      ],
+      "completed_tasks": [],
+      "gaps": [
+        {
+          "issue": "Missing methodology section",
+          "suggestion": "Schedule 1hr meeting to align on approach"
+        }
+      ],
+      "sync_score": 75,
+      "cross_insights": [
+        "Reuse literature review template from previous course"
+      ]
+    },
+    {
+      "project_name": "WIA2003",
+      "pending_tasks": [
+        {
+          "id": "ts_1775904929",
+          "title": "Setup Project Repository",
+          "description": "Initialize git and README",
+          "deadline": "2026-03-09",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Team Lead",
+          "follow_up": "Confirm repository name and assign first owner"
+        }
+      ],
+      "completed_tasks": [],
+      "gaps": [
+        {
+          "issue": "Missing methodology section",
+          "suggestion": "Schedule 1hr meeting to align on approach"
+        }
+      ],
+      "sync_score": 75,
+      "cross_insights": [
+        "Reuse literature review template from previous course"
+      ]
+    }
+  ]
 }

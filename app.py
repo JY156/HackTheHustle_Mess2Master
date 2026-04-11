@@ -260,10 +260,10 @@ def complete_task():
 
 @app.route("/sync-notion", methods=["POST"])
 def sync_notion():
-    """Optional Notion sync - wrapped in try/except to never crash demo"""
+    """Sync tasks to Notion. Always returns JSON, even on crashes."""
     try:
-        # Check if Notion is configured
-        if not os.getenv("NOTION_TOKEN") or not os.getenv("NOTION_DB_ID"):
+        # Check credentials first
+        if not os.getenv("NOTION_TOKEN") or not os.getenv("NOTION_DATABASE_ID"):
             return jsonify({
                 "status": "fallback",
                 "message": "Notion not configured. Use clipboard export instead.",
@@ -275,51 +275,65 @@ def sync_notion():
         if not projects:
             return jsonify({"status": "error", "message": "No projects to sync"}), 400
         
-        # Sync first project (MVP scope)
-        project = projects[0]
-        tasks = project.get("pending_tasks", []) + project.get("completed_tasks", [])
+        # Check if specific project requested
+        req_data = request.get_json(silent=True) or {}
+        target_project_name = req_data.get("project_name")
         
-        if not tasks:
-            return jsonify({"status": "error", "message": "No tasks to sync"}), 400
+        if target_project_name:
+            project = next((p for p in projects if p.get("project_name") == target_project_name), None)
+            if not project:
+                return jsonify({"status": "error", "message": f"Project '{target_project_name}' not found"}), 404
+            projects_to_sync = [project]
+        else:
+            projects_to_sync = projects
+
+        synced_count = 0
+        errors = []
         
-        notion = NotionClient()
-        result = notion.sync_tasks(tasks, project.get("project_name", "Untitled"))
-        
-        # Fallback if API fails
-        if result.get("status") != "success":
+        for proj in projects_to_sync:
+            all_tasks = proj.get("pending_tasks", []) + proj.get("completed_tasks", [])
+            if not all_tasks: continue
+            
+            try:
+                # Import here to catch missing file gracefully
+                from notion_client import NotionClient
+                client = NotionClient()
+                result = client.sync_tasks(all_tasks, proj.get("project_name", "Untitled"))
+                
+                if result.get("status") == "success":
+                    synced_count += result.get("synced_count", 0)
+                else:
+                    errors.extend(result.get("errors", []))
+            except ImportError:
+                errors.append("Notion client not installed. Run: pip install requests")
+            except Exception as e:
+                errors.append(f"{proj.get('project_name')}: {str(e)}")
+
+        if synced_count > 0:
+            return jsonify({
+                "status": "success", 
+                "synced_count": synced_count, 
+                "total_tasks": len([t for p in projects_to_sync for t in p.get("pending_tasks", [])]),
+                "errors": errors
+            })
+        else:
+            # Graceful fallback to clipboard
             return jsonify({
                 "status": "fallback",
-                "message": "Notion API failed. Here's your checklist:",
-                "clipboard_markdown": generate_notion_markdown(tasks)
+                "message": "Notion API failed. Checklist copied to clipboard.",
+                "clipboard_markdown": generate_notion_markdown()
             })
-        return jsonify(result)
-        
+            
     except Exception as e:
-        print(f"❌ /sync-notion error: {e}")
-        # Never crash - return markdown fallback
+        # 🔥 NEVER return HTML. Always return JSON.
+        print(f"❌ /sync-notion CRASH: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
-            "status": "fallback",
-            "message": f"Notion sync error: {str(e)}. Use clipboard instead.",
+            "status": "error",
+            "message": f"Server error: {str(e)}",
             "clipboard_markdown": generate_notion_markdown()
-        })
-
-def generate_notion_markdown(tasks=None):
-    """Generate Notion-compatible markdown checklist"""
-    if tasks is None:
-        data = load_state()
-        tasks = []
-        for p in data.get("projects", []):
-            tasks.extend(p.get("pending_tasks", []))
-    
-    lines = [f"## 📋 Mess2Master Tasks - {time.strftime('%Y-%m-%d')}"]
-    for t in tasks:
-        status = "[x]" if t.get("status") == "completed" else "[ ]"
-        prio = "🔴" if t.get("priority")=="high" else "🟡" if t.get("priority")=="medium" else "🟢"
-        dl = t.get("deadline") or "TBD"
-        lines.append(f"- {status} **{t.get('title')}** {prio} (Due: {dl})")
-        if t.get("description"):
-            lines.append(f"  > {t.get('description')[:100]}")
-    return "\n".join(lines)
+        }), 500
 
 @app.route("/api/reset", methods=["POST"])
 def reset_semester():
