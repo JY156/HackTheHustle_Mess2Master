@@ -1,49 +1,56 @@
-// static/js/main.js - Fetch + display results
-document.getElementById('uploadForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const formData = new FormData(e.target);
-    const response = await fetch('/process', {
-        method: 'POST',
-        body: formData
-    });
-    
-    const data = await response.json();
-    
-    // Display tasks
-    const tasksDiv = document.getElementById('tasks');
-    tasksDiv.innerHTML = data.tasks.map(task => `
-        <div class="task priority-${task.priority}">
-        <strong>${task.title}</strong>
-        <p>${task.description}</p>
-        <small>Due: ${task.due_date || 'TBD'} | ${task.priority.toUpperCase()}</small>
-        </div>
-    `).join('');
-    
-    document.getElementById('results').style.display = 'block';
-    
-    // Store data for calendar button
-    window.projectData = data;
-});
+document.addEventListener('DOMContentLoaded', () => {
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const fileList = document.getElementById('fileList');
+    const form = document.getElementById('uploadForm');
+    const submitBtn = document.getElementById('submitBtn');
 
-// Add to main.js - Calendar button handler
-document.getElementById('addToCalendar').addEventListener('click', async () => {
-    const topTask = window.projectData.tasks[0]; // Highest priority
-    
-    const response = await fetch('/process', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-        files: [], // Re-send if needed, or cache
-        notes: "", 
-        create_calendar: true,
-        top_deadline: {
-            title: topTask.title,
-            date: topTask.due_date
-        }
-        })
+    // Drag & Drop UI
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = 'var(--primary)'; });
+    dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = 'var(--border)'; });
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.style.borderColor = 'var(--border)';
+        fileInput.files = e.dataTransfer.files;
+        updateFileList();
     });
-    
-    const data = await response.json();
-    alert(data.calendar_result?.message || "Calendar updated!");
+    fileInput.addEventListener('change', updateFileList);
+
+    function updateFileList() {
+        const files = Array.from(fileInput.files);
+        fileList.textContent = files.length ? files.map(f => f.name).join(', ') : 'Supports multimodal input';
+    }
+
+    // Form Submit
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing AI...';
+
+        const formData = new FormData(form);
+        try {
+            const res = await fetch('/process', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (data.status === 'success') window.location.reload();
+            else alert('Processing completed with unexpected format.');
+        } catch (err) {
+            console.error(err);
+            alert('Error processing upload. Check console.');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Generate Plan';
+        }
+    });
+
+    // Calendar Redirect (Google Calendar URL Template)
+    document.querySelectorAll('.btn-calendar').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const title = encodeURIComponent(btn.dataset.title || 'Mess2Master Task');
+            const date = btn.dataset.date || new Date().toISOString().split('T')[0].replace(/-/g, '');
+            const formatted = date.replace(/-/g, '');
+            const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${formatted}/${formatted}&details=Task%20extracted%20by%20Mess2Master%20AI`;
+            window.open(url, '_blank');
+        });
+    });
 });

@@ -1,0 +1,24 @@
+[
+  {
+    "project_name": "Demo Project",
+    "tasks": [
+      {
+        "title": "Setup Project Repository",
+        "description": "Initialize git and README",
+        "due_date": "2026-03-09",
+        "priority": "high",
+        "owner": "Team Lead"
+      }
+    ],
+    "gaps": [
+      {
+        "issue": "Missing methodology section",
+        "suggestion": "Schedule 1hr meeting to align on approach"
+      }
+    ],
+    "sync_score": 75,
+    "cross_insights": [
+      "Reuse literature review template from previous course"
+    ]
+  }
+]
