@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tasks | Mess2Master</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="logo">← Back to Upload</a>
+        <span class="badge">Hack The Hustle 2026</span>
+    </nav>
+
+    <main class="container">
+        <h1>📋 Task Board</h1>
+        
+        <!-- Project Tabs -->
+        <div class="project-tabs">
+            {% for p in projects %}
+            <button class="tab-btn {{ 'active' if loop.first }}" data-project="{{ p.project_name }}">
+                {{ p.project_name }}
+            </button>
+            {% endfor %}
+        </div>
+
+        <!-- Master Priority Queue -->
+        <section class="card">
+            <h2>🔥 Master Priority Queue</h2>
+            <div class="task-list" id="masterList">
+                {% for t in master_tasks %}
+                <div class="task-item {{ t.priority }}" data-id="{{ t.id }}" data-project="{{ t.project }}">
+                    <label class="task-check">
+                        <input type="checkbox" class="complete-toggle">
+                        <span class="task-title">{{ t.task }}</span>
+                        <small class="task-project">({{ t.project }})</small>
+                    </label>
+                    <div class="task-meta">
+                        <span>{{ t.deadline or 'TBD' }}</span>
+                        <span class="badge {{ t.priority }}">{{ t.priority.upper() }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <!-- Project-Specific Tasks -->
+        {% for p in projects %}
+        <section class="card project-section" data-project="{{ p.project_name }}" style="display: {{ 'block' if loop.first else 'none' }}">
+            <div class="project-header">
+                <h3>{{ p.project_name }}</h3>
+                <div class="sync-badge {{ 'healthy' if p.sync_score >= 70 else 'critical' }}">
+                    📊 Sync: {{ p.sync_score }}%
+                </div>
+            </div>
+
+            <div class="gaps-section">
+                <h4>⚠️ Smart Gap Detection</h4>
+                {% for g in p.gaps %}
+                <div class="gap-item">
+                    <strong>{{ g.issue }}</strong>
+                    <p>💡 {{ g.suggestion }}</p>
+                </div>
+                {% endfor %}
+            </div>
+
+            <h4>✅ Pending Tasks</h4>
+            <div class="task-list">
+                {% for t in p.pending_tasks %}
+                <div class="task-item {{ t.priority }}" data-id="{{ t.id }}">
+                    <label class="task-check">
+                        <input type="checkbox" class="complete-toggle">
+                        <span class="task-title">{{ t.task }}</span>
+                    </label>
+                    <div class="task-meta">
+                        <span>{{ t.deadline }}</span>
+                        <span class="badge {{ t.priority }}">{{ t.priority.upper() }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            {% if p.completed_tasks %}
+            <h4 style="margin-top: 1.5rem">✅ Completed</h4>
+            <div class="task-list completed-list">
+                {% for t in p.completed_tasks %}
+                <div class="task-item completed" data-id="{{ t.id }}">
+                    <label class="task-check">
+                        <input type="checkbox" class="complete-toggle" checked>
+                        <span class="task-title"><s>{{ t.task }}</s></span>
+                    </label>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </section>
+        {% endfor %}
+    </main>
+
+    <script src="/static/js/tasks.js"></script>
+</body>
+</html>

@@ -78,3 +78,56 @@ button[type="submit"]:disabled { opacity: 0.7; cursor: not-allowed; }
 .footer-links a { color: var(--text-muted); text-decoration: none; display: flex; align-items: center; gap: 0.4rem; transition: 0.2s; }
 .footer-links a:hover { color: var(--primary); }
 .copyright { font-size: 0.85rem; color: var(--text-muted); }
+
+/* === NAV ACTIONS === */
+.nav-actions { display: flex; align-items: center; gap: 1rem; }
+.nav-link { color: var(--text-muted); text-decoration: none; display: flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; transition: 0.2s; }
+.nav-link:hover { color: var(--primary); }
+.btn-reset { background: transparent; border: 1px solid var(--border); color: var(--text-muted); padding: 0.4rem 0.6rem; border-radius: 6px; cursor: pointer; transition: 0.2s; }
+.btn-reset:hover { border-color: var(--danger); color: var(--danger); }
+
+/* === SEMESTER BANNER === */
+.semester-banner { background: linear-gradient(135deg, rgba(99,102,241,0.1), rgba(139,92,246,0.1)); border: 1px solid var(--primary); margin-bottom: 2rem; }
+.semester-banner h3 { margin-bottom: 0.5rem; color: var(--primary); }
+.banner-desc { color: var(--text-muted); margin-bottom: 1rem; font-size: 0.95rem; }
+.semester-form { background: var(--surface); padding: 1rem; border-radius: 8px; }
+.semester-form .form-row { grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+#saveSemesterBtn { margin-top: 0.5rem; }
+
+/* === PROJECT SELECTOR === */
+.project-selector { display: flex; gap: 0.5rem; }
+.project-selector .form-control { flex: 1; padding: 0.7rem; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 8px; }
+.form-hint { display: block; margin-top: 0.3rem; font-size: 0.8rem; color: var(--text-muted); }
+
+/* === CARD HEADER UTILS === */
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.btn-sm { background: transparent; border: 1px solid var(--border); color: var(--primary); padding: 0.3rem 0.8rem; border-radius: 6px; text-decoration: none; font-size: 0.85rem; transition: 0.2s; }
+.btn-sm:hover { background: var(--primary); color: white; }
+
+/* === GAP PREVIEW === */
+.gap-preview { background: rgba(245,158,11,0.1); padding: 0.5rem 0.8rem; border-radius: 6px; margin-top: 0.5rem; }
+.gap-preview small { color: var(--warn); }
+
+/* === TASK ITEM COMPATIBILITY === */
+/* Support both old (title/due_date) and new (task/deadline) field names */
+.task-item .task-title,
+.task-item strong { font-weight: 600; }
+.task-item .task-project { color: var(--text-muted); font-size: 0.8rem; }
+
+/* === RESPONSIVE TWEAKS === */
+@media (max-width: 768px) {
+    .semester-form .form-row { grid-template-columns: 1fr; }
+    .project-selector { flex-direction: column; }
+    .nav-actions { gap: 0.5rem; }
+    .nav-link span { display: none; }
+}
+
+.drop-zone.multiple-files {
+    border-color: var(--success);
+    background: rgba(16, 185, 129, 0.05);
+}
+
+.drop-zone.multiple-files .file-hint {
+    color: var(--success);
+    font-weight: 500;
+}
