@@ -97,6 +97,18 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // === Calendar Redirect (per-task buttons) ===
+    document.querySelectorAll('.btn-calendar-icon').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const title = encodeURIComponent(btn.dataset.title || 'Mess2Master Task');
+            const date = (btn.dataset.date || new Date().toISOString().split('T')[0]).replace(/-/g, '');
+            const formatted = date.replace(/-/g, '');
+            const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${formatted}/${formatted}&details=Task%20extracted%20by%20Mess2Master%20AI`;
+            window.open(url, '_blank');
+        });
+    });
+    
     // === Sync Button Handler (Per Project) ===
     document.querySelectorAll('.card-sync-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
