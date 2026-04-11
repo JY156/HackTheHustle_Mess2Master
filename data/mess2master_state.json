@@ -1,0 +1,9 @@
+{
+  "semester": {
+    "start": "2026-01-12",
+    "end": "2026-05-15",
+    "break_week": 8,
+    "configured": false
+  },
+  "projects": []
+}
