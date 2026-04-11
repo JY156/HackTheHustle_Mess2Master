@@ -23,18 +23,24 @@ def create_calendar_event(title: str, date: str, description: str = "") -> dict:
     return {
         "status": "created",
         "event": {"title": title, "date": date, "description": description},
-        "message": f"✅ Added '{title}' to your calendar for {date}"
+        "message": f"Added '{title}' to your calendar for {date}"
     }
 
 # --- Main AI Client ---
-class ProjectPulseAI:
+class Mess2MasterAI:
     def __init__(self):
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
             raise ValueError("GEMINI_API_KEY not found. Check your .env file.")
         self.client = genai.Client(api_key=api_key)
-        #self.model = "gemini-2.0-flash"
-        self.model = "gemini-pro"
+        # Option 1
+        self.model = "gemini-2.0-flash"
+
+        # Option 2
+        # self.model = "gemini-1.5-flash"
+
+        # Option 3
+        # self.model = "gemini-1.5-pro"
 
     def extract_tasks(self, files: list, notes: str, create_calendar: bool = False):
         """Core function: Turn messy input → structured tasks"""

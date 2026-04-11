@@ -5,11 +5,11 @@ import os
 load_dotenv()
 
 # Now import your modules
-from gemini_client import ProjectPulseAI
+from gemini_client import Mess2MasterAI
 from flask import Flask, request, jsonify, render_template
 
 app = Flask(__name__)
-ai = ProjectPulseAI()
+ai = Mess2MasterAI()
 
 @app.route('/')
 def index():
