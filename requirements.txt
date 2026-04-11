@@ -90,6 +90,7 @@ tokenizers==0.22.1
 torch==2.9.1
 tqdm==4.67.1
 transformers==4.57.2
+python-telegram-bot==21.10
 typing-inspection==0.4.2
 typing_extensions==4.15.0
 tzdata==2025.2
