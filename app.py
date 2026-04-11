@@ -3,13 +3,17 @@ from dotenv import load_dotenv
 import os
 import json
 from gemini_client import Mess2MasterAI
+from notion_client import NotionClient
 
-load_dotenv()
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(BASE_DIR, ".env"))
+load_dotenv(os.path.join(os.path.dirname(BASE_DIR), ".env"))
 app = Flask(__name__)
 ai = Mess2MasterAI()
-DATA_FILE = "data/projects.json"
+DATA_DIR = os.path.join(BASE_DIR, "data")
+DATA_FILE = os.path.join(DATA_DIR, "projects.json")
 
-os.makedirs("data", exist_ok=True)
+os.makedirs(DATA_DIR, exist_ok=True)
 
 def load_projects():
     if not os.path.exists(DATA_FILE):
@@ -41,22 +45,60 @@ def dashboard():
 
 @app.route("/process", methods=["POST"])
 def process_upload():
-    files = request.files.getlist("files")
-    notes = request.form.get("notes", "")
-    sem_start = request.form.get("sem_start", "2026-01-12")
-    sem_end = request.form.get("sem_end", "2026-05-15")
+    try:
+        files = request.files.getlist("files")
+        notes = request.form.get("notes", "")
+        sem_start = request.form.get("sem_start", "2026-01-12")
+        sem_end = request.form.get("sem_end", "2026-05-15")
 
-    result = ai.extract_tasks(files, notes, sem_start, sem_end)
+        received_files = []
+        for file in files:
+            file_bytes = file.read()
+            received_files.append({"name": file.filename, "size": len(file_bytes)})
+            file.stream.seek(0)
 
-    projects = load_projects()
-    existing = next((p for p in projects if p.get("project_name") == result.get("project_name")), None)
-    if existing:
-        existing.update(result)
-    else:
-        projects.append(result)
-    save_projects(projects)
+        print(f"📥 Received files: {received_files}")
+        print(f"📝 Notes preview: {notes[:120]}")
 
-    return jsonify({"status": "success", "project_name": result.get("project_name")})
+        result = ai.extract_tasks(files, notes, sem_start, sem_end)
+
+        save_projects([result])
+
+        return jsonify({
+            "status": "success",
+            "project_name": result.get("project_name"),
+            "received_files": received_files,
+            "fallback": bool(result.get("_meta", {}).get("fallback")),
+            "fallback_reason": result.get("_meta", {}).get("fallback_reason"),
+            "used_model": result.get("_meta", {}).get("used_model"),
+            "pdf_text_extracted": bool(result.get("_meta", {}).get("pdf_text_extracted")),
+        })
+    except Exception as e:
+        print(f"❌ /process error: {e}")
+        return jsonify({"status": "error", "error": str(e)}), 500
+
+@app.route("/sync-notion", methods=["POST"])
+def sync_notion():
+    try:
+        projects = load_projects()
+        if not projects:
+            return jsonify({"status": "error", "message": "No projects to sync"}), 400
+        
+        project = projects[0]
+        tasks = project.get("tasks", [])
+        
+        if not tasks:
+            return jsonify({"status": "error", "message": "No tasks to sync"}), 400
+        
+        notion = NotionClient()
+        result = notion.sync_tasks(tasks, project.get("project_name", "Untitled Project"))
+
+        if result.get("status") != "success":
+            return jsonify(result), 400
+        return jsonify(result)
+    except Exception as e:
+        print(f"❌ /sync-notion error: {e}")
+        return jsonify({"status": "error", "error": str(e)}), 500
 
 if __name__ == "__main__":
     print("🚀 Mess2Master running on http://127.0.0.1:5000")

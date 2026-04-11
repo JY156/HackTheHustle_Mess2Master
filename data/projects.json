@@ -1,24 +1,58 @@
 [
   {
-    "project_name": "Demo Project",
+    "project_name": "Varsity Hackathon 2026 Final Round Project",
     "tasks": [
       {
-        "title": "Setup Project Repository",
-        "description": "Initialize git and README",
-        "due_date": "2026-03-09",
+        "title": "Project Development & Improvement",
+        "description": "Teams are permitted to make modifications and improvements to their project and must develop a fully functional prototype.",
+        "due_date": "2026-04-24",
         "priority": "high",
-        "owner": "Team Lead"
+        "owner": "Team"
+      },
+      {
+        "title": "Final Round Submission",
+        "description": "Submit latest pitching slides and GitHub link to source codes through the V HACK 2026 Website.",
+        "due_date": "2026-04-24",
+        "priority": "high",
+        "owner": "Team"
+      },
+      {
+        "title": "Live Project Pitching",
+        "description": "Present the project prototype demonstration during the allotted pitching time slot.",
+        "due_date": "2026-04-25",
+        "priority": "high",
+        "owner": "Team"
+      },
+      {
+        "title": "Mentoring Session",
+        "description": "Participate in the Final Round Mentoring Session.",
+        "due_date": "2026-04-08",
+        "priority": "medium",
+        "owner": "Team"
       }
     ],
     "gaps": [
       {
-        "issue": "Missing methodology section",
-        "suggestion": "Schedule 1hr meeting to align on approach"
+        "issue": "The specific domains for the Top 20 teams are not mentioned.",
+        "suggestion": "Clarify the different domains or categories teams are competing in."
+      },
+      {
+        "issue": "Details on the judging criteria for each aspect (Technical, Business, Pitching) are not fully elaborated.",
+        "suggestion": "Provide more specific sub-criteria or examples for each judging aspect."
       }
     ],
-    "sync_score": 75,
+    "sync_score": 0,
     "cross_insights": [
-      "Reuse literature review template from previous course"
-    ]
+      "The hackathon requires a fully functional prototype and source code submission.",
+      "Pitching sessions have strict time limits (12 minutes) with reminders.",
+      "The final round involves both virtual submissions and physical pitching.",
+      "GitHub repository links must be set to public for evaluation."
+    ],
+    "_meta": {
+      "pdf_text_extracted": true,
+      "used_model": "gemini-2.5-flash-lite",
+      "fallback": false,
+      "fallback_reason": null
+    }
   }
 ]

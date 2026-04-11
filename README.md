@@ -44,6 +44,68 @@ Student projects stall because critical information stays scattered across chat 
 - Icons/Fonts: Font Awesome 6, Inter (Google Fonts)
 - Deployment Ready: WSGI-compatible, environment-configured
 
+## ▶️ Run Locally
+
+### 1) Create and activate a virtual environment
+
+Windows PowerShell:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+macOS/Linux:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### 2) Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3) Configure environment variables
+
+Create a `.env` file in the project root:
+
+```env
+GEMINI_API_KEY=your_api_key_here
+# Optional model override
+GEMINI_MODEL=gemini-2.0-flash
+```
+
+### 4) Start the app
+
+```bash
+python app.py
+```
+
+Open: `http://127.0.0.1:5000`
+
+## ✅ Quick Testing Checklist
+
+1. Homepage loads without errors.
+2. Paste sample notes and submit with no files.
+3. Upload at least one supported file (`pdf`, `docx`, `txt`, `png`, `jpg`) and submit.
+4. Confirm tasks appear on the dashboard and are sorted by priority/date.
+5. Confirm generated project data is saved to `data/projects.json`.
+
+## 🧪 Optional Local API Test (PowerShell)
+
+Use this to verify `/process` directly:
+
+```powershell
+Invoke-RestMethod -Uri http://127.0.0.1:5000/process -Method Post -Form @{
+    notes = "Week 4: finish slides, assign presenter"
+    sem_start = "2026-01-12"
+    sem_end = "2026-05-15"
+}
+```
+
 ## 🤝 Team & Submission
 - Built for: Hack The Hustle 2026 – "Boosting Productivity using Gemini"
 - GitHub: https://github.com/JY156/HackTheHustle_GeminiFlow
