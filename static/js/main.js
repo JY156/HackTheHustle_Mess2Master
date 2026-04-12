@@ -1,39 +1,85 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // === DOM Elements ===
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
     const fileList = document.getElementById('fileList');
     const form = document.getElementById('uploadForm');
     const submitBtn = document.getElementById('submitBtn');
     const submitStatus = document.getElementById('submitStatus');
-    const semStartInput = form.querySelector('input[name="sem_start"]');
-    const semEndInput = form.querySelector('input[name="sem_end"]');
+    const projectSelect = document.getElementById('projectSelect');
+    const newProjectInput = document.getElementById('newProjectInput');
+    const projectHint = document.getElementById('projectHint');
+    const semesterBanner = document.getElementById('semesterBanner');
+    const saveSemesterBtn = document.getElementById('saveSemesterBtn');
+    const resetSemesterBtn = document.getElementById('resetSemesterBtn');
     const projectsList = document.getElementById('projectsList');
+    const syncNotionBtn = document.getElementById('syncNotionBtn');
+    const syncStatus = document.getElementById('syncStatus');
+
     const selectedFiles = new Map();
     const MAX_FILES = 10;
 
-    // Prevent "nothing happened" UX when required date fields are left blank.
-    if (semStartInput && !semStartInput.value) semStartInput.value = '2026-01-12';
-    if (semEndInput && !semEndInput.value) semEndInput.value = '2026-05-15';
+    // === 1. Check Semester Status on Load ===
+    async function checkSemester() {
+        try {
+            const res = await fetch('/api/semester/status');
+            const data = await res.json();
+            if (semesterBanner) {
+                semesterBanner.style.display = data.configured ? 'none' : 'block';
+            }
+        } catch (err) {
+            console.warn('Semester check failed:', err);
+            if (semesterBanner) semesterBanner.style.display = 'block';
+        }
+    }
+    checkSemester();
 
-    // Drag & Drop UI
-    dropZone.addEventListener('click', () => fileInput.click());
-    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = 'var(--primary)'; });
-    dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = 'var(--border)'; });
-    dropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropZone.style.borderColor = 'var(--border)';
-        addFiles(e.dataTransfer.files);
-    });
-    fileInput.addEventListener('change', () => {
-        addFiles(fileInput.files);
-        // Allow re-selecting the same filename in subsequent picker opens.
-        fileInput.value = '';
+    // === 2. Save Semester Settings ===
+    saveSemesterBtn?.addEventListener('click', async () => {
+        const start = document.getElementById('semStart')?.value;
+        const end = document.getElementById('semEnd')?.value;
+        const breakWeek = document.getElementById('breakWeek')?.value || 8;
+        
+        if (!start || !end) {
+            alert('Please select both semester start and end dates');
+            return;
+        }
+        
+        try {
+            const res = await fetch('/api/semester', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({start, end, break_week: breakWeek})
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                semesterBanner.style.display = 'none';
+                alert('✅ Semester settings saved!');
+            }
+        } catch (err) {
+            console.error('Save semester failed:', err);
+            alert('Failed to save semester settings');
+        }
     });
 
+    // === 3. Reset Semester ===
+    resetSemesterBtn?.addEventListener('click', async () => {
+        if (!confirm('⚠️ This will delete all projects and tasks. Start fresh?')) return;
+        try {
+            const res = await fetch('/api/reset', {method: 'POST'});
+            const data = await res.json();
+            if (data.status === 'reset') window.location.reload();
+        } catch (err) {
+            console.error('Reset failed:', err);
+            alert('Failed to reset semester');
+        }
+    });
+
+    // === 4. File Management (Main's robust chip system) ===
     function syncFileInput() {
         const dataTransfer = new DataTransfer();
         selectedFiles.forEach((file) => dataTransfer.items.add(file));
-        fileInput.files = dataTransfer.files;
+        if (fileInput) fileInput.files = dataTransfer.files;
     }
 
     function addFiles(filesLike) {
@@ -41,20 +87,13 @@ document.addEventListener('DOMContentLoaded', () => {
         Array.from(filesLike || []).forEach((file) => {
             const key = `${file.name}-${file.size}-${file.lastModified}`;
             if (selectedFiles.has(key)) return;
-            if (selectedFiles.size >= MAX_FILES) {
-                skippedCount += 1;
-                return;
-            }
+            if (selectedFiles.size >= MAX_FILES) { skippedCount += 1; return; }
             selectedFiles.set(key, file);
         });
         syncFileInput();
         updateFileList();
-
         if (skippedCount > 0) {
-            setSubmitStatus(
-                `You can upload up to ${MAX_FILES} files at once. ${skippedCount} file${skippedCount > 1 ? 's were' : ' was'} not added.`,
-                'error'
-            );
+            setSubmitStatus(`You can upload up to ${MAX_FILES} files at once. ${skippedCount} file${skippedCount > 1 ? 's were' : ' was'} not added.`, 'error');
         }
     }
 
@@ -65,40 +104,50 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateFileList() {
+        if (!fileList) return;
         const files = Array.from(selectedFiles.values());
         fileList.innerHTML = '';
 
         if (!files.length) {
             fileList.textContent = `Supports PDF, DOC, DOCX, TXT, MP3, WAV, M4A, OGG · up to ${MAX_FILES} files`;
+            if (dropZone) dropZone.classList.remove('multiple-files');
             return;
         }
 
         selectedFiles.forEach((file, key) => {
             const chip = document.createElement('span');
             chip.className = 'file-chip';
-
             const name = document.createElement('span');
             name.className = 'file-chip-name';
             name.textContent = file.name;
-
             const removeBtn = document.createElement('button');
             removeBtn.type = 'button';
             removeBtn.className = 'file-chip-remove';
             removeBtn.setAttribute('aria-label', `Remove ${file.name}`);
-            removeBtn.title = `Remove ${file.name}`;
             removeBtn.textContent = 'x';
-            removeBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                removeFile(key);
-            });
-
+            removeBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); removeFile(key); });
             chip.appendChild(name);
             chip.appendChild(removeBtn);
             fileList.appendChild(chip);
         });
+
+        if (dropZone) {
+            dropZone.classList.toggle('multiple-files', files.length > 1);
+        }
     }
 
+    // Drag & Drop
+    dropZone?.addEventListener('click', () => fileInput?.click());
+    dropZone?.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = 'var(--primary)'; });
+    dropZone?.addEventListener('dragleave', () => { dropZone.style.borderColor = 'var(--border)'; });
+    dropZone?.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.style.borderColor = 'var(--border)';
+        if (fileInput) { addFiles(e.dataTransfer.files); fileInput.value = ''; }
+    });
+    fileInput?.addEventListener('change', () => { addFiles(fileInput.files); fileInput.value = ''; });
+
+    // === 5. Status Helpers ===
     function setSubmitStatus(message, type = '') {
         if (!submitStatus) return;
         submitStatus.textContent = message;
@@ -106,32 +155,34 @@ document.addEventListener('DOMContentLoaded', () => {
         if (type) submitStatus.classList.add(type);
     }
 
-    // Show a one-time success message after reload.
+    // Restore status after reload
     const pendingStatus = window.sessionStorage.getItem('submitStatusMessage');
-    const shouldScrollToResults = window.sessionStorage.getItem('scrollToResults') === '1';
+    const shouldScroll = window.sessionStorage.getItem('scrollToResults') === '1';
     if (pendingStatus) {
         setSubmitStatus(pendingStatus, 'success');
         window.sessionStorage.removeItem('submitStatusMessage');
     }
-    if (shouldScrollToResults && projectsList) {
+    if (shouldScroll && projectsList) {
         projectsList.scrollIntoView({ behavior: 'smooth', block: 'start' });
         projectsList.classList.add('just-updated');
         setTimeout(() => projectsList.classList.remove('just-updated'), 1800);
         window.sessionStorage.removeItem('scrollToResults');
     }
 
-    // Form Submit
-    form.addEventListener('submit', async (e) => {
+    // === Form Submit (Stay on Index, Show Updated Project) ===
+    form?.addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (!form.checkValidity()) { form.reportValidity(); setSubmitStatus('Please fill all required fields.', 'error'); return; }
 
-        if (!form.checkValidity()) {
-            form.reportValidity();
-            setSubmitStatus('Please fill all required fields.', 'error');
-            return;
-        }
+        // 🔑 Smart project name resolution: New Input > Dropdown
+        const newProjectVal = newProjectInput?.value.trim();
+        const existingProjectVal = projectSelect?.value;
+        let projectName = '';
+        if (newProjectVal) { projectName = newProjectVal; }
+        else if (existingProjectVal) { projectName = existingProjectVal; }
 
-        if (!fileInput.files.length) {
-            setSubmitStatus('Please add at least one file before generating.', 'error');
+        if (!projectName) {
+            alert('⚠️ Please select an existing project OR type a new project name');
             return;
         }
 
@@ -140,40 +191,35 @@ document.addEventListener('DOMContentLoaded', () => {
         setSubmitStatus('Uploading data and generating your plan...', 'loading');
 
         const formData = new FormData(form);
+        formData.set('project_name', projectName); // ✅ Force correct value
+
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 45000);
+
         try {
             const res = await fetch('/process', { method: 'POST', body: formData, signal: controller.signal });
             const data = await res.json().catch(() => ({}));
 
-            if (!res.ok) {
-                const message = data.error || `Request failed (${res.status})`;
-                throw new Error(message);
-            }
+            if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
 
             if (data.status === 'success') {
-                const receivedNames = Array.isArray(data.received_files) && data.received_files.length
-                    ? ` Files: ${data.received_files.map(file => file.name).join(', ')}`
-                    : ' No files received.';
-                let successMessage = `Plan generated for ${data.project_name || 'your project'}.${receivedNames}`;
-                if (data.fallback) {
-                    const reason = data.fallback_reason || 'AI fallback triggered';
-                    const model = data.used_model || 'unknown model';
-                    successMessage = `Fallback result used (${model}). Reason: ${reason}.${receivedNames}`;
-                }
-                setSubmitStatus(`${successMessage} Refreshing...`, 'success');
-                window.sessionStorage.setItem('submitStatusMessage', successMessage);
-                window.sessionStorage.setItem('scrollToResults', '1');
+                const received = Array.isArray(data.received_files) ? data.received_files.map(f => f.name).join(', ') : '';
+                let msg = `✅ Plan updated for ${data.project_name || 'your project'}.`;
+                if (data.fallback) msg = `⚠️ Fallback result used (${data.used_model || 'unknown'}). Reason: ${data.fallback_reason || 'AI limit'}.`;
+                if (received) msg += ` Files: ${received}`;
+                
+                setSubmitStatus(`${msg} Refreshing view...`, 'success');
+                
+                // ✅ STAY ON INDEX: Just reload to show updated project
                 setTimeout(() => window.location.reload(), 1200);
+            } else {
+                throw new Error('Processing completed with unexpected format.');
             }
-            else throw new Error('Processing completed with unexpected format.');
         } catch (err) {
             console.error(err);
-            const message = err.name === 'AbortError'
-                ? 'Request timed out after 45s. Try a smaller file or retry.'
-                : err.message;
-            setSubmitStatus(`Error: ${message}`, 'error');
-            alert(`Error processing upload: ${message}`);
+            const msg = err.name === 'AbortError' ? 'Request timed out after 45s. Try a smaller file.' : err.message;
+            setSubmitStatus(`Error: ${msg}`, 'error');
+            alert(`Error processing upload: ${msg}`);
         } finally {
             clearTimeout(timeoutId);
             submitBtn.disabled = false;
@@ -181,22 +227,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Calendar Redirect (Google Calendar URL Template) - per-task buttons
+    // === 7. Calendar Redirect (per-task buttons) ===
     document.querySelectorAll('.btn-calendar-icon').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.preventDefault();
             const title = encodeURIComponent(btn.dataset.title || 'Mess2Master Task');
-            const date = btn.dataset.date || new Date().toISOString().split('T')[0].replace(/-/g, '');
-            const formatted = date.replace(/-/g, '');
-            const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${formatted}/${formatted}&details=Task%20extracted%20by%20Mess2Master%20AI`;
+            const date = (btn.dataset.date || new Date().toISOString().split('T')[0]).replace(/-/g, '');
+            const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${date}/${date}&details=Task%20extracted%20by%20Mess2Master%20AI`;
             window.open(url, '_blank');
         });
     });
 
-    // Notion Sync Button
-    const syncNotionBtn = document.getElementById('syncNotionBtn');
-    const syncStatus = document.getElementById('syncStatus');
-
+    // === 8. Notion Sync (with fallback) ===
     if (syncNotionBtn) {
         syncNotionBtn.addEventListener('click', async () => {
             syncNotionBtn.disabled = true;
@@ -209,15 +251,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await res.json();
 
                 if (res.ok && data.status === 'success') {
-                    syncStatus.textContent = `✅ Synced ${data.synced_count}/${data.total_tasks} tasks to Notion`;
+                    syncStatus.textContent = `✅ Synced ${data.synced_count || 'all'} tasks to Notion`;
                     syncStatus.className = 'sync-status success';
-                    if (data.errors.length > 0) {
-                        syncStatus.textContent += ` (${data.errors.length} warnings)`;
-                    }
                 } else {
-                    const detailed = Array.isArray(data.errors) && data.errors.length ? data.errors[0] : '';
-                    syncStatus.textContent = `❌ Sync failed: ${data.message || data.error || detailed || 'Unknown error'}`;
-                    syncStatus.className = 'sync-status error';
+                    // Fallback: copy markdown to clipboard
+                    if (data.clipboard_markdown) {
+                        await navigator.clipboard.writeText(data.clipboard_markdown);
+                        syncStatus.textContent = '✅ Notion API unavailable. Checklist copied to clipboard!';
+                        syncStatus.className = 'sync-status success';
+                        alert('📋 Markdown checklist copied! Open Notion → New Page → Ctrl+V');
+                    } else {
+                        syncStatus.textContent = `❌ Sync failed: ${data.message || data.error || 'Unknown error'}`;
+                        syncStatus.className = 'sync-status error';
+                    }
                 }
             } catch (err) {
                 console.error(err);
@@ -228,5 +274,194 @@ document.addEventListener('DOMContentLoaded', () => {
                 syncNotionBtn.innerHTML = '<i class="fas fa-database"></i> Sync to Notion';
             }
         });
+    }
+
+    // === Notion Sync (Multiple Buttons) ===
+    document.querySelectorAll('[id^="syncNotionBtn-"]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const btnId = btn.id.split('-')[1];
+            const statusEl = document.getElementById(`syncStatus-${btnId}`);
+            const projectName = btn.dataset.project;
+            
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing...';
+            statusEl.textContent = 'Syncing tasks to Notion...';
+            statusEl.className = 'sync-status loading';
+
+            try {
+                const res = await fetch('/sync-notion', { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                // 🔍 Check if response is actually JSON
+                const contentType = res.headers.get("content-type");
+                if (!contentType || !contentType.includes("application/json")) {
+                    const htmlError = await res.text();
+                    console.error("❌ Server returned HTML instead of JSON:", htmlError.substring(0, 300));
+                    throw new Error("Server returned an error page. Check console for details.");
+                }
+                
+                const data = await res.json();
+
+                if (res.ok && data.status === 'success') {
+                    statusEl.textContent = `✅ Synced ${data.synced_count || 'all'} tasks to Notion`;
+                    statusEl.className = 'sync-status success';
+                } else {
+                    // Fallback: copy markdown to clipboard
+                    if (data.clipboard_markdown) {
+                        await navigator.clipboard.writeText(data.clipboard_markdown);
+                        statusEl.textContent = '✅ Notion API unavailable. Checklist copied to clipboard!';
+                        statusEl.className = 'sync-status success';
+                        alert(`📋 Markdown checklist for "${projectName}" copied!\n\nOpen Notion → New Page → Ctrl+V`);
+                    } else {
+                        statusEl.textContent = `❌ Sync failed: ${data.message || data.error || 'Unknown error'}`;
+                        statusEl.className = 'sync-status error';
+                    }
+                }
+            } catch (err) {
+                console.error(err);
+                statusEl.textContent = `❌ Error: ${err.message}`;
+                statusEl.className = 'sync-status error';
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-database"></i> Sync to Notion';
+            }
+        });
+    });
+
+    // === Voice Feature with Privacy Flow ===
+    const privacyModal = document.getElementById('privacyModal');
+    const startVoiceBtn = document.getElementById('startVoiceBtn');
+    const stopVoiceBtn = document.getElementById('stopVoiceBtn');
+    const agreePrivacy = document.getElementById('agreePrivacy');
+    const cancelPrivacy = document.getElementById('cancelPrivacy');
+    const voiceStatus = document.getElementById('voiceStatus');
+    const liveTranscript = document.getElementById('liveTranscript');
+
+    let recognition = null;
+    let isRecording = false;
+    let fullTranscript = '';
+    let hasAgreedPrivacy = sessionStorage.getItem('voicePrivacyAgreed') === 'true';
+
+    // 1. Privacy Modal Handlers
+    if (startVoiceBtn && privacyModal) {
+    startVoiceBtn.addEventListener('click', () => {
+        if (!hasAgreedPrivacy) {
+        privacyModal.style.display = 'flex';
+        } else {
+        startRecording();
+        }
+    });
+    }
+
+    if (agreePrivacy) {
+    agreePrivacy.addEventListener('click', () => {
+        hasAgreedPrivacy = true;
+        sessionStorage.setItem('voicePrivacyAgreed', 'true');
+        privacyModal.style.display = 'none';
+        startRecording();
+    });
+    }
+
+    if (cancelPrivacy) {
+    cancelPrivacy.addEventListener('click', () => privacyModal.style.display = 'none');
+    }
+
+    // 2. Web Speech API Setup
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+    recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = (event) => {
+        let interim = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+            const sentence = transcript.trim().replace(/[.?!]+$/, '');
+            fullTranscript += `${sentence}. `;
+        }
+        else interim = transcript;
+        }
+        liveTranscript.innerHTML = `<strong>Transcript:</strong> ${fullTranscript}<br><em style="color: var(--text-muted);">Listening: ${interim}</em>`;
+        liveTranscript.scrollTop = liveTranscript.scrollHeight;
+    };
+
+    recognition.onerror = (event) => {
+        console.error('Speech error:', event.error);
+        voiceStatus.innerHTML = `<span style="color: var(--danger);">❌ ${event.error}. Try again.</span>`;
+        stopRecordingUI();
+    };
+
+    recognition.onend = () => { if (isRecording) recognition.start(); };
+    } else {
+    voiceStatus.innerHTML = '⚠️ Voice not supported. Please use Chrome or Edge.';
+    if (startVoiceBtn) startVoiceBtn.disabled = true;
+    }
+
+    // 3. Recording Controls
+    function startRecording() {
+    if (!recognition) return;
+    fullTranscript = '';
+    isRecording = true;
+    recognition.start();
+    startVoiceBtn.style.display = 'none';
+    stopVoiceBtn.style.display = 'inline-flex';
+    voiceStatus.innerHTML = '<span class="recording-dot"></span> Recording... Speak clearly. AI is listening.';
+    liveTranscript.style.display = 'block';
+    liveTranscript.innerHTML = '<em>Listening...</em>';
+    }
+
+    function stopRecordingUI() {
+    isRecording = false;
+    stopVoiceBtn.style.display = 'none';
+    startVoiceBtn.style.display = 'inline-flex';
+    }
+
+    if (stopVoiceBtn) {
+    stopVoiceBtn.addEventListener('click', async () => {
+        if (!recognition) return;
+        recognition.stop();
+        stopRecordingUI();
+        voiceStatus.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Extracting tasks from conversation...';
+        
+        if (fullTranscript.trim().length > 30) {
+        await processVoiceTranscript(fullTranscript);
+        } else {
+        voiceStatus.innerHTML = '⚠️ Too short. Try speaking more.';
+        liveTranscript.style.display = 'none';
+        }
+    });
+    }
+
+    // 4. Send to Backend
+    async function processVoiceTranscript(transcript) {
+    try {
+        const formData = new FormData();
+        formData.append('notes', `Voice meeting transcript:\n${transcript}`);
+        
+        const projSelect = document.getElementById('projectSelect');
+        const newProjInput = document.getElementById('newProjectInput');
+        const projectName = (newProjInput?.value?.trim()) || (projSelect?.value) || 'Voice Meeting';
+        formData.append('project_name', projectName);
+        formData.append('sem_start', document.querySelector('input[name="sem_start"]')?.value || '2026-01-12');
+        formData.append('sem_end', document.querySelector('input[name="sem_end"]')?.value || '2026-05-15');
+
+        const res = await fetch('/process', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (data.status === 'success') {
+        voiceStatus.innerHTML = '✅ Tasks extracted! Refreshing view...';
+        setTimeout(() => window.location.reload(), 1500);
+        } else {
+        voiceStatus.innerHTML = `❌ ${data.error || 'Processing failed'}`;
+        }
+    } catch (err) {
+        console.error(err);
+        voiceStatus.innerHTML = `❌ Network error: ${err.message}`;
+    }
     }
 });

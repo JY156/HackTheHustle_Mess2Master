@@ -100,7 +100,9 @@ class InMemoryUpload:
     """Minimal file-like wrapper compatible with Mess2MasterAI.extract_tasks."""
 
     def __init__(self, filename: str, data: bytes, mimetype: str | None = None):
+    def __init__(self, filename: str, data: bytes, mimetype: str | None = None):
         self.filename = filename
+        self.mimetype = mimetype
         self.mimetype = mimetype
         self.stream = BytesIO(data)
 
@@ -416,6 +418,7 @@ def has_strong_signal(text: str) -> bool:
 
 def to_calendar_url(task: dict) -> str:
     title = quote(task.get("title") or "Mess2Master Task")
+    title = quote(task.get("title") or "Mess2Master Task")
     due = task.get("due_date") or date.today().isoformat()
     if " " in due:
         date_part, time_part = due.split(" ", 1)
@@ -427,6 +430,7 @@ def to_calendar_url(task: dict) -> str:
         end = start
     return (
         "https://calendar.google.com/calendar/render?action=TEMPLATE"
+        f"&text={title}&dates={start}/{end}&details=Task%20detected%20by%20Mess2Master"
         f"&text={title}&dates={start}/{end}&details=Task%20detected%20by%20Mess2Master"
     )
 
@@ -448,7 +452,9 @@ def build_actions_markup(task: dict) -> InlineKeyboardMarkup:
 
 def render_group_card(tasks: list[dict], source_text: str, username: str) -> str:
     heading = "<b>✨ Mess2Master: Task Detected</b>"
+    heading = "<b>✨ Mess2Master: Task Detected</b>"
     if len(tasks) > 1:
+        heading = f"<b>✨ Mess2Master: {len(tasks)} Tasks Detected</b>"
         heading = f"<b>✨ Mess2Master: {len(tasks)} Tasks Detected</b>"
     lines = [heading]
     for idx, task in enumerate(tasks, start=1):
@@ -634,6 +640,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     chat_id=chat_id,
                     message_id=state["message_id"],
                     text=format_task_list_message("✨ Mess2Master: Task Detected", state["tasks"], notes),
+                    text=format_task_list_message("✨ Mess2Master: Task Detected", state["tasks"], notes),
                     parse_mode=ParseMode.HTML,
                     reply_markup=build_actions_markup(state["tasks"][-1]),
                 )
@@ -643,6 +650,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return
 
             sent = await message.reply_text(
+                format_task_list_message("✨ Mess2Master: Task Detected", tasks, notes),
                 format_task_list_message("✨ Mess2Master: Task Detected", tasks, notes),
                 parse_mode=ParseMode.HTML,
                 reply_markup=build_actions_markup(tasks[0]),
@@ -671,6 +679,11 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         telegram_file = await context.bot.get_file(message.document.file_id)
         raw = await telegram_file.download_as_bytearray()
 
+        upload = InMemoryUpload(
+            message.document.file_name or "upload.bin",
+            bytes(raw),
+            mimetype=message.document.mime_type,
+        )
         upload = InMemoryUpload(
             message.document.file_name or "upload.bin",
             bytes(raw),
@@ -719,6 +732,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         try:
             notion = NotionClient()
+            project_name = query.message.text.split("\n", 1)[0].replace("<b>", "").replace("</b>", "") if query.message.text else "Mess2Master"
             project_name = query.message.text.split("\n", 1)[0].replace("<b>", "").replace("</b>", "") if query.message.text else "Mess2Master"
             result = notion.sync_tasks(state["tasks"], project_name)
             if result.get("status") == "success":

@@ -1,105 +1,349 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, redirect
 from dotenv import load_dotenv
-import os
-import json
+import os, json, time, threading
 from gemini_client import Mess2MasterAI
-from notion_client import NotionClient
+from notion_client import NotionClient  # Optional: wrapped in try/except
 
+# === Config & Init ===
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 load_dotenv(os.path.join(os.path.dirname(BASE_DIR), ".env"))
+
 app = Flask(__name__)
 ai = Mess2MasterAI()
-DATA_DIR = os.path.join(BASE_DIR, "data")
-DATA_FILE = os.path.join(DATA_DIR, "projects.json")
+DATA_FILE = os.path.join(BASE_DIR, "data", "mess2master_state.json")
+os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
 
-os.makedirs(DATA_DIR, exist_ok=True)
+# === Thread-Safe JSON I/O (Prevent Race Conditions) ===
+DATA_LOCK = threading.Lock()
 
-def load_projects():
-    if not os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "w") as f: json.dump([], f)
-        return []
-    try:
-        with open(DATA_FILE, "r") as f: return json.load(f)
-    except: return []
+def load_state():
+    """Load state with lock + migration support"""
+    with DATA_LOCK:
+        if not os.path.exists(DATA_FILE):
+            default = {"semester": {}, "projects": []}
+            with open(DATA_FILE, "w") as f: json.dump(default, f, indent=2)
+            return default
+        try:
+            with open(DATA_FILE, "r") as f:
+                data = json.load(f)
+                # ✅ Migrate old list format → new structure
+                if isinstance(data, list):
+                    data = {"semester": {}, "projects": data}
+                # ✅ Migrate old task schema (due_date → deadline)
+                for p in data.get("projects", []):
+                    for t in p.get("tasks", []):
+                        if "deadline" not in t and "due_date" in t:
+                            t["deadline"] = t["due_date"]
+                        if "id" not in t:
+                            t["id"] = f"ts_{int(time.time())}_{hash(t.get('title',''))%10000}"
+                        if "status" not in t:
+                            t["status"] = "pending"
+                    # Ensure split arrays exist
+                    if "pending_tasks" not in p and "tasks" in p:
+                        p["pending_tasks"] = [t for t in p["tasks"] if t.get("status") != "completed"]
+                        p["completed_tasks"] = [t for t in p["tasks"] if t.get("status") == "completed"]
+                return data
+        except Exception as e:
+            print(f"⚠️ Load state error: {e}")
+            return {"semester": {}, "projects": []}
 
-def save_projects(projects):
-    with open(DATA_FILE, "w") as f: json.dump(projects, f, indent=2)
+def save_state(data):
+    """Save state with lock"""
+    with DATA_LOCK:
+        with open(DATA_FILE, "w") as f:
+            json.dump(data, f, indent=2)
+
+# === Helper: Safe Sort Key (Prevent NoneType Crash) ===
+def safe_deadline(task):
+    """Return deadline string or far-future sentinel for null-safe sorting"""
+    dl = task.get("deadline") or task.get("due_date")
+    return dl if dl else "2099-12-31"
+
+def priority_score(priority):
+    return {"high": 3, "medium": 2, "low": 1}.get(priority, 1)
+
+# === Helper: Merge Tasks by ID ===
+def merge_tasks(existing, new_tasks):
+    """Merge new tasks into existing, preserving IDs and avoiding duplicates"""
+    existing_map = {t.get("id"): t for t in existing if t.get("id")}
+    
+    for new in new_tasks:
+        key = new.get("id")
+        if key and key in existing_map:
+            # Update existing task fields (except id)
+            existing_map[key].update({k: v for k, v in new.items() if k != "id"})
+        else:
+            # Add new task with guaranteed ID
+            if not new.get("id"):
+                new["id"] = f"ts_{int(time.time())}_{hash(new.get('title',''))%10000}"
+            new["status"] = "pending"
+            existing.append(new)
+    return existing
+
+# === Routes ===
 
 @app.route("/")
-def dashboard():
-    projects = load_projects()
+def index():
+    """Upload page + project selection"""
+    data = load_state()
+    projects = data.get("projects", [])
+    project_names = [p.get("project_name") for p in projects]
+    semester = data.get("semester", {})
     
-    # Build master priority queue across all projects
-    all_tasks = []
+    # Build master preview (null-safe sort)
+    master_tasks = []
     for p in projects:
-        for t in p.get("tasks", []):
-            t["project"] = p["project_name"]
-            t["score"] = 3 if t.get("priority") == "high" else 2 if t.get("priority") == "medium" else 1
-            all_tasks.append(t)
-            
-    # Sort: High priority first, then earliest due date
-    all_tasks.sort(key=lambda x: (-x["score"], x.get("due_date", "9999-12-31")))
+        for t in p.get("pending_tasks", []):
+            t_copy = t.copy()
+            t_copy["project"] = p["project_name"]
+            t_copy["score"] = priority_score(t_copy.get("priority"))
+            master_tasks.append(t_copy)
+    master_tasks.sort(key=lambda x: (-x["score"], safe_deadline(x)))
     
-    return render_template("index.html", projects=projects, master_tasks=all_tasks[:20])
+    return render_template("index.html",
+                         project_names=project_names,
+                         semester=semester,
+                         projects=projects,
+                         master_tasks=master_tasks[:5])  # Preview only
+
+@app.route("/tasks")
+def tasks_page():
+    """Task board view with project tabs"""
+    data = load_state()
+    projects = data.get("projects", [])
+    
+    # Build master queue (null-safe sort)
+    all_pending = []
+    for p in projects:
+        for t in p.get("pending_tasks", []):
+            t_copy = t.copy()
+            t_copy["project"] = p["project_name"]
+            t_copy["score"] = priority_score(t_copy.get("priority"))
+            all_pending.append(t_copy)
+    all_pending.sort(key=lambda x: (-x["score"], safe_deadline(x)))
+    
+    return render_template("tasks.html", 
+                         projects=projects, 
+                         master_tasks=all_pending[:20])
+
+@app.route("/api/semester", methods=["POST"])
+def set_semester():
+    """Save semester settings"""
+    data = load_state()
+    data["semester"] = {
+        "start": request.json.get("start"),
+        "end": request.json.get("end"),
+        "break_week": int(request.json.get("break_week", 8))
+    }
+    save_state(data)
+    return jsonify({"status": "success"})
+
+@app.route("/api/semester/status", methods=["GET"])
+def semester_status():
+    """Check if semester is configured"""
+    data = load_state()
+    semester = data.get("semester", {})
+    return jsonify({
+        "configured": bool(semester.get("start")),
+        "start": semester.get("start"),
+        "end": semester.get("end"),
+        "break_week": semester.get("break_week", 8)
+    })
+
+@app.route("/api/projects", methods=["GET"])
+def list_projects():
+    """List project names for dropdown"""
+    data = load_state()
+    return jsonify([p.get("project_name") for p in data.get("projects", [])])
 
 @app.route("/process", methods=["POST"])
 def process_upload():
+    """Process input and merge tasks into selected project"""
     try:
+        data = load_state()
+        project_name = request.form.get("project_name")
+        if not project_name:
+            return jsonify({"error": "project_name required"}), 400
+        
         files = request.files.getlist("files")
         notes = request.form.get("notes", "")
-        sem_start = request.form.get("sem_start", "2026-01-12")
-        sem_end = request.form.get("sem_end", "2026-05-15")
-
-        received_files = []
-        for file in files:
-            file_bytes = file.read()
-            received_files.append({"name": file.filename, "size": len(file_bytes)})
-            file.stream.seek(0)
-
-        print(f"📥 Received files: {received_files}")
-        print(f"📝 Notes preview: {notes[:120]}")
-
-        result = ai.extract_tasks(files, notes, sem_start, sem_end)
-
-        save_projects([result])
-
+        semester = data.get("semester", {})
+        sem_start = semester.get("start", "2026-01-12")
+        sem_end = semester.get("end", "2026-05-15")
+        break_week = semester.get("break_week", 8)
+        
+        # Get existing pending tasks for merge context
+        project = next((p for p in data["projects"] if p.get("project_name") == project_name), None)
+        existing_pending = project.get("pending_tasks", []) if project else []
+        
+        # Call AI with merge context
+        result = ai.extract_tasks(
+            files, notes, sem_start, sem_end,
+            existing_pending=existing_pending,
+            break_week=break_week
+        )
+        
+        # Merge logic
+        new_tasks = result.get("tasks", [])
+        merged_tasks = merge_tasks(existing_pending, new_tasks)
+        
+        # Update or create project
+        if project:
+            project["pending_tasks"] = merged_tasks
+            project["gaps"] = result.get("gaps", [])
+            project["sync_score"] = result.get("sync_score", 75)
+            project["cross_insights"] = result.get("cross_insights", [])
+        else:
+            data["projects"].append({
+                "project_name": project_name,
+                "pending_tasks": merged_tasks,
+                "completed_tasks": [],
+                "gaps": result.get("gaps", []),
+                "sync_score": result.get("sync_score", 75),
+                "cross_insights": result.get("cross_insights", [])
+            })
+        
+        save_state(data)
+        
+        # Return diagnostics for frontend transparency
         return jsonify({
             "status": "success",
-            "project_name": result.get("project_name"),
-            "received_files": received_files,
-            "fallback": bool(result.get("_meta", {}).get("fallback")),
+            "project_name": project_name,
+            "fallback": result.get("_meta", {}).get("fallback", False),
             "fallback_reason": result.get("_meta", {}).get("fallback_reason"),
             "used_model": result.get("_meta", {}).get("used_model"),
-            "pdf_text_extracted": bool(result.get("_meta", {}).get("pdf_text_extracted")),
+            "pdf_extracted": result.get("_meta", {}).get("pdf_text_extracted", False)
         })
+        
     except Exception as e:
         print(f"❌ /process error: {e}")
         return jsonify({"status": "error", "error": str(e)}), 500
 
+@app.route("/api/tasks/complete", methods=["POST"])
+def complete_task():
+    """Toggle task completion status"""
+    data = load_state()
+    req = request.json
+    project_name = req.get("project_name")
+    task_id = req.get("task_id")
+    
+    project = next((p for p in data["projects"] if p.get("project_name") == project_name), None)
+    if not project:
+        return jsonify({"error": "Project not found"}), 404
+    
+    pending = project.get("pending_tasks", [])
+    completed = project.get("completed_tasks", [])
+    
+    # Find in pending → move to completed
+    task = next((t for t in pending if t.get("id") == task_id), None)
+    if task:
+        task["status"] = "completed"
+        pending = [t for t in pending if t.get("id") != task_id]
+        completed.append(task)
+        project["pending_tasks"] = pending
+        project["completed_tasks"] = completed
+        save_state(data)
+        return jsonify({"status": "completed"})
+    
+    # Find in completed → move back to pending
+    task = next((t for t in completed if t.get("id") == task_id), None)
+    if task:
+        task["status"] = "pending"
+        completed = [t for t in completed if t.get("id") != task_id]
+        pending.append(task)
+        project["pending_tasks"] = pending
+        project["completed_tasks"] = completed
+        save_state(data)
+        return jsonify({"status": "pending"})
+    
+    return jsonify({"error": "Task not found"}), 404
+
 @app.route("/sync-notion", methods=["POST"])
 def sync_notion():
+    """Sync tasks to Notion. Always returns JSON, even on crashes."""
     try:
-        projects = load_projects()
+        # Check credentials first
+        if not os.getenv("NOTION_TOKEN") or not os.getenv("NOTION_DATABASE_ID"):
+            return jsonify({
+                "status": "fallback",
+                "message": "Notion not configured. Use clipboard export instead.",
+                "clipboard_markdown": generate_notion_markdown()
+            })
+        
+        data = load_state()
+        projects = data.get("projects", [])
         if not projects:
             return jsonify({"status": "error", "message": "No projects to sync"}), 400
         
-        project = projects[0]
-        tasks = project.get("tasks", [])
+        # Check if specific project requested
+        req_data = request.get_json(silent=True) or {}
+        target_project_name = req_data.get("project_name")
         
-        if not tasks:
-            return jsonify({"status": "error", "message": "No tasks to sync"}), 400
-        
-        notion = NotionClient()
-        result = notion.sync_tasks(tasks, project.get("project_name", "Untitled Project"))
+        if target_project_name:
+            project = next((p for p in projects if p.get("project_name") == target_project_name), None)
+            if not project:
+                return jsonify({"status": "error", "message": f"Project '{target_project_name}' not found"}), 404
+            projects_to_sync = [project]
+        else:
+            projects_to_sync = projects
 
-        if result.get("status") != "success":
-            return jsonify(result), 400
-        return jsonify(result)
+        synced_count = 0
+        errors = []
+        
+        for proj in projects_to_sync:
+            all_tasks = proj.get("pending_tasks", []) + proj.get("completed_tasks", [])
+            if not all_tasks: continue
+            
+            try:
+                # Import here to catch missing file gracefully
+                from notion_client import NotionClient
+                client = NotionClient()
+                result = client.sync_tasks(all_tasks, proj.get("project_name", "Untitled"))
+                
+                if result.get("status") == "success":
+                    synced_count += result.get("synced_count", 0)
+                else:
+                    errors.extend(result.get("errors", []))
+            except ImportError:
+                errors.append("Notion client not installed. Run: pip install requests")
+            except Exception as e:
+                errors.append(f"{proj.get('project_name')}: {str(e)}")
+
+        if synced_count > 0:
+            return jsonify({
+                "status": "success", 
+                "synced_count": synced_count, 
+                "total_tasks": len([t for p in projects_to_sync for t in p.get("pending_tasks", [])]),
+                "errors": errors
+            })
+        else:
+            # Graceful fallback to clipboard
+            return jsonify({
+                "status": "fallback",
+                "message": "Notion API failed. Checklist copied to clipboard.",
+                "clipboard_markdown": generate_notion_markdown()
+            })
+            
     except Exception as e:
-        print(f"❌ /sync-notion error: {e}")
-        return jsonify({"status": "error", "error": str(e)}), 500
+        # 🔥 NEVER return HTML. Always return JSON.
+        print(f"❌ /sync-notion CRASH: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "status": "error",
+            "message": f"Server error: {str(e)}",
+            "clipboard_markdown": generate_notion_markdown()
+        }), 500
 
+@app.route("/api/reset", methods=["POST"])
+def reset_semester():
+    """Clear all data for new semester"""
+    save_state({"semester": {}, "projects": []})
+    return jsonify({"status": "reset"})
+
+# === Run ===
 if __name__ == "__main__":
     print("🚀 Mess2Master running on http://127.0.0.1:5000")
+    print(f"📁 Data file: {DATA_FILE}")
     app.run(debug=True, port=5000)
