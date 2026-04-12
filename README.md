@@ -1,4 +1,5 @@
 # 🚀 Mess2Master
+
 > Turn chaotic project data into clear, actionable plans with Gemini AI | Hack The Hustle 2026
 
 [![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://python.org)
@@ -6,110 +7,193 @@
 [![Flask](https://img.shields.io/badge/Flask-Lightweight-orange.svg)](https://flask.palletsprojects.com)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+---
+
 ## 🎯 The Problem
-Student projects stall because critical information stays scattered across chat threads, rough notes, and assignment PDFs. Teams spend more energy managing coordination than actually creating work. This "coordination tax" leads to missed deadlines, duplicated efforts, and lost momentum.
+
+Student projects stall because critical information stays scattered across chat threads, rough notes, and assignment PDFs. Teams spend more energy managing coordination than actually creating work.
+
+This **"coordination tax"** leads to:
+
+* Missed deadlines
+* Duplicated efforts
+* Lost momentum
+
+---
 
 ## ✨ The Solution
-**Mess2Master** ingests unstructured team data and uses **Google's Gemini AI** to instantly generate structured project intelligence:
-- ✅ **Prioritized task lists** with deadlines & owner suggestions
-- ✅ **Smart gap analysis** (flags missing sections or unassigned roles)
-- ✅ **Calendar integration** via function calling
-- ✅ **Resilient fallback system** ensuring reliable demo & production UX
+
+**Mess2Master** ingests unstructured team data and uses **Google Gemini AI** to generate structured project intelligence instantly.
+
+```
+📥 Messy Input (PDFs, voice, chats)
+
+                ↓
+
+🧠 AI Processing (Gemini multimodal)
+
+                ↓
+
+📋 Structured Output (Tasks, deadlines, gaps)
+```
+
+### Key Capabilities
+
+* ✅ **Prioritized task lists** with deadlines & owner suggestions
+* ✅ **Smart gap analysis** (missing sections, unassigned roles)
+* ✅ **Calendar integration** (Google Calendar links)
+* ✅ **Voice-first meetings** with live transcription
+* ✅ **Resilient fallback system** for reliable UX
+
+---
 
 ## 🛠️ Features
-| Feature | Description |
-|---------|-------------|
-| 📄 Multimodal Input | Upload PDFs, DOCs, TXT files + paste chat logs/meeting notes |
-| 🧠 AI Task Extraction | Gemini converts messy text into structured JSON tasks |
-| 🎯 Smart Prioritization | Auto-scores tasks by deadline proximity, rubric weight, & dependencies |
-| 📅 Calendar Sync | One-click deadline creation (mock function calling for hackathon) |
-| 🛡️ Graceful Degradation | Built-in fallback ensures UI never breaks during API limits |
-| 📱 Modern UI | Responsive design, drag-and-drop upload, real-time loading states |
+
+| Feature                      | Description                                     |
+| ---------------------------- | ----------------------------------------------- |
+| 📄 **Multimodal Input**      | Upload PDFs, DOCs, TXT, MP3, WAV or paste notes |
+| 🎤 **Voice Meeting Capture** | Record meetings → extract tasks automatically   |
+| 🧠 **AI Task Extraction**    | Converts messy text into structured JSON tasks  |
+| 🎯 **Smart Prioritization**  | Scores tasks by urgency, weight, dependencies   |
+| 📅 **Calendar Sync**         | One-click Google Calendar integration           |
+| 🔗 **Notion Integration**    | Sync tasks or copy to clipboard                 |
+| 🛡️ **Graceful Degradation** | Multi-model fallback chain                      |
+| 📊 **Gap Detection**         | Identifies missing work, roles, conflicts       |
+| 📱 **Responsive UI**         | Clean, modern, drag-and-drop interface          |
+
+---
 
 ## 🧠 How It Works
-           [Upload PDF + Paste Notes]
-                       ↓
-     [Flask Backend Receives Multipart Form]
-                       ↓
-     [Gemini API Processes Multimodal Input]
-                       ↓
- [Structured JSON Output: Tasks, Deadlines, Gaps]
-                       ↓
-[Frontend Renders Priority Cards + Calendar Action]
+
+1. **Upload** → PDFs, voice notes, or meeting text
+2. **Process** → AI extracts tasks + detects gaps
+3. **Display** → Master Priority List + Project Cards
+4. **Act** → Calendar sync, Notion export, mark complete
+5. **Iterate** → Add more inputs → AI merges safely
+
+---
 
 ## 📦 Tech Stack
-- Backend: Python 3.9+, Flask, python-dotenv
-- AI Engine: Google Gemini API (google-genai SDK), Structured JSON Output, Function Calling
-- Frontend: HTML5, CSS3 (Modern Grid/Flexbox), Vanilla JavaScript
-- Icons/Fonts: Font Awesome 6, Inter (Google Fonts)
-- Deployment Ready: WSGI-compatible, environment-configured
 
-## ▶️ Run Locally
+| Layer         | Technology                                 |
+| ------------- | ------------------------------------------ |
+| **Backend**   | Python 3.9+, Flask, python-dotenv          |
+| **AI Engine** | Google Gemini API (`google-genai`)         |
+| **Speech**    | Web Speech API                             |
+| **Frontend**  | HTML5, CSS3, Vanilla JavaScript            |
+| **Storage**   | Local JSON (`data/mess2master_state.json`) |
 
-### 1) Create and activate a virtual environment
+---
 
-Windows PowerShell:
+## 🚀 Quick Start (5 Minutes)
 
-```powershell
+```bash
+# 1. Clone repository
+git clone https://github.com/JY156/HackTheHustle_GeminiFlow.git
+cd HackTheHustle_GeminiFlow
+
+# 2. Create virtual environment
 python -m venv .venv
+
+# 3. Activate environment
+# Windows:
 .\.venv\Scripts\Activate.ps1
-```
-
-macOS/Linux:
-
-```bash
-python3 -m venv .venv
+# macOS/Linux:
 source .venv/bin/activate
-```
 
-### 2) Install dependencies
-
-```bash
+# 4. Install dependencies
 pip install -r requirements.txt
+
+# 5. Configure environment variables
+cp .env.example .env
+# Add your GEMINI_API_KEY
+
+# 6. Start the app
+python app.py
+
+# 7. Open in browser
+http://127.0.0.1:5000
 ```
 
-### 3) Configure environment variables
+---
 
-Create a `.env` file in the project root:
+## 🎮 Usage
 
-```env
-GEMINI_API_KEY=your_api_key_here
-# Optional model override
-GEMINI_MODEL=gemini-2.0-flash
-```
-
-### 4) Start the app
+### Run App
 
 ```bash
 python app.py
 ```
 
-Open: `http://127.0.0.1:5000`
+### Workflow
 
-## ✅ Quick Testing Checklist
+1. **First Visit** → Set semester dates
+2. **Upload** → Files or meeting notes
+3. **Select Project** → Existing or new
+4. **Generate** → AI creates tasks
+5. **Act**
 
-1. Homepage loads without errors.
-2. Paste sample notes and submit with no files.
-3. Upload at least one supported file (`pdf`, `docx`, `txt`, `png`, `jpg`) and submit.
-4. Confirm tasks appear on the dashboard and are sorted by priority/date.
-5. Confirm generated project data is saved to `data/projects.json`.
+   * 🗓️ Add to Google Calendar
+   * 🔗 Sync to Notion
+   * ✅ Mark tasks complete
 
-## 🧪 Optional Local API Test (PowerShell)
+---
 
-Use this to verify `/process` directly:
+## 🎤 Voice Meeting Feature (Chrome/Edge)
 
-```powershell
-Invoke-RestMethod -Uri http://127.0.0.1:5000/process -Method Post -Form @{
-    notes = "Week 4: finish slides, assign presenter"
-    sem_start = "2026-01-12"
-    sem_end = "2026-05-15"
-}
-```
+1. Click **"Start Listening"**
+2. Accept privacy modal (audio stays local)
+3. Conduct meeting normally
+4. Click **"Stop & Extract"**
+5. Tasks are automatically generated
+
+---
+
+## 🔑 Key Concepts
+
+### Multimodal Input Processing
+
+* **PDFs** → PyPDF2 + Gemini fallback
+* **Voice** → Web Speech API → transcript → AI
+* **Text** → Direct prompt processing
+
+### Model Fallback Chain
+
+If the primary model fails:
+
+1. Automatically switches to backup models
+2. Ensures uninterrupted UX
+
+### Semester-Aware Date Parsing
+
+* Converts **"Week 4" → actual date**
+* Supports semester boundaries & break weeks
+
+### Merge-Safe Task Management
+
+* Unique task IDs (`ts_<timestamp>_<hash>`)
+* Updates tasks without overwriting
+* Separates pending vs completed
+
+### Gap Detection
+
+Identifies:
+
+* Missing deliverables
+* Unassigned roles
+* Timeline conflicts
+* Undefined technical decisions
+
+---
 
 ## 🤝 Team & Submission
-- Built for: Hack The Hustle 2026 – "Boosting Productivity using Gemini"
-- GitHub: https://github.com/JY156/HackTheHustle_GeminiFlow
-- Pitch Deck:
+
+* **Event:** Hack The Hustle 2026 – *Boosting Productivity using Gemini*
+* **GitHub:** https://github.com/JY156/HackTheHustle_GeminiFlow
+* **Pitching Deck:** https://canva.link/0ginb13i6sv7wpt
+
+---
 
 ## 📄 License
-MIT License – Open for educational & hackathon use. See LICENSE for details.
+
+MIT License — free for educational and hackathon use.
