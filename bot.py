@@ -100,7 +100,6 @@ class InMemoryUpload:
     """Minimal file-like wrapper compatible with Mess2MasterAI.extract_tasks."""
 
     def __init__(self, filename: str, data: bytes, mimetype: str | None = None):
-    def __init__(self, filename: str, data: bytes, mimetype: str | None = None):
         self.filename = filename
         self.mimetype = mimetype
         self.mimetype = mimetype
