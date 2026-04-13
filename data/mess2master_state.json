@@ -1,0 +1,51 @@
+{
+  "semester": {},
+  "projects": [
+    {
+      "project_name": "Introduction to Python",
+      "pending_tasks": [
+        {
+          "id": "ts_1776089749_dummy",
+          "title": "Review syllabus and assign deadlines manually",
+          "description": "AI models were unavailable and no clear dates were found in the text.",
+          "deadline": "2026-01-12",
+          "due_date_source": "suggested",
+          "priority": "high",
+          "status": "pending",
+          "owner": null,
+          "follow_up": "Check original PDF for schedule"
+        },
+        {
+          "id": "ts_1776089830_0",
+          "title": "Complete a python swasp API tomorrow",
+          "description": "complete a python swasp API tomorrow",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "you",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776089830_1",
+          "title": "A lab report",
+          "description": "a lab report",
+          "deadline": "2026-04-17",
+          "due_date_source": "suggested",
+          "priority": "high",
+          "status": "pending",
+          "owner": "you",
+          "follow_up": null
+        }
+      ],
+      "completed_tasks": [],
+      "gaps": [
+        {
+          "issue": "AI was unavailable. Tasks were generated via Regex.",
+          "suggestion": "Review descriptions to ensure they make sense."
+        }
+      ],
+      "cross_insights": []
+    }
+  ]
+}
