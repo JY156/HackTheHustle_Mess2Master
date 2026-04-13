@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, render_template, redirect
 from dotenv import load_dotenv
 import os, json, time, threading
+from datetime import datetime
 from gemini_client import Mess2MasterAI
 from notion_client import NotionClient  # Optional: wrapped in try/except
 
@@ -13,6 +14,10 @@ app = Flask(__name__)
 ai = Mess2MasterAI()
 DATA_FILE = os.path.join(BASE_DIR, "data", "mess2master_state.json")
 os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
+WEB_ALERT_DUE_SOON_HOURS = int(os.getenv("WEB_ALERT_DUE_SOON_HOURS", "24"))
+WEB_ALERT_STALLED_HOURS = int(os.getenv("WEB_ALERT_STALLED_HOURS", "48"))
+GUIDANCE_CACHE = {}
+GUIDANCE_CACHE_TTL_SEC = int(os.getenv("GUIDANCE_CACHE_TTL_SEC", "3600"))
 
 # === Thread-Safe JSON I/O (Prevent Race Conditions) ===
 DATA_LOCK = threading.Lock()
@@ -92,6 +97,30 @@ def find_task(data, project_name, task_id):
     return project, None
 
 
+def guidance_cache_key(project_name, task):
+    return "|".join([
+        str(project_name or ""),
+        str(task.get("id") or ""),
+        str(task.get("title") or task.get("task") or ""),
+        str(task.get("deadline") or task.get("due_date") or ""),
+        str(task.get("priority") or ""),
+    ])
+
+
+def get_cached_guidance(key):
+    item = GUIDANCE_CACHE.get(key)
+    if not item:
+        return None
+    if (time.time() - item.get("ts", 0)) > GUIDANCE_CACHE_TTL_SEC:
+        GUIDANCE_CACHE.pop(key, None)
+        return None
+    return item.get("payload")
+
+
+def set_cached_guidance(key, payload):
+    GUIDANCE_CACHE[key] = {"ts": time.time(), "payload": payload}
+
+
 def notion_dashboard_url():
     direct = (os.getenv("NOTION_DATABASE_URL") or "").strip()
     if direct:
@@ -131,6 +160,86 @@ def build_display_gaps(project):
 
     return base_gaps
 
+
+def parse_deadline_for_alert(task):
+    raw = str(task.get("deadline") or task.get("due_date") or "").strip()
+    if not raw:
+        return None
+    for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M", "%Y-%m-%d"):
+        try:
+            dt = datetime.strptime(raw, fmt)
+            if fmt == "%Y-%m-%d":
+                return dt.replace(hour=23, minute=59)
+            return dt
+        except ValueError:
+            continue
+    return None
+
+
+def parse_created_at_from_id(task):
+    task_id = str(task.get("id") or "")
+    parts = task_id.split("_")
+    if len(parts) < 2 or not parts[1].isdigit():
+        return None
+    try:
+        return datetime.fromtimestamp(int(parts[1]))
+    except Exception:
+        return None
+
+
+def build_project_alerts(project):
+    alerts = []
+    now = datetime.now()
+    for task in project.get("pending_tasks", []) or []:
+        title = str(task.get("title") or task.get("task") or "Untitled").strip()
+        task_id = str(task.get("id") or "").strip()
+        owner = str(task.get("owner") or "").strip().lower()
+        unassigned = (not owner) or owner == "unassigned"
+        if not unassigned:
+            continue
+
+        deadline_dt = parse_deadline_for_alert(task)
+        if deadline_dt:
+            delta_hours = (deadline_dt - now).total_seconds() / 3600.0
+            if delta_hours < 0:
+                alerts.append({"type": "overdue", "title": title, "task_id": task_id})
+                continue
+            if delta_hours <= WEB_ALERT_DUE_SOON_HOURS:
+                alerts.append({"type": "due_soon", "title": title, "task_id": task_id})
+                continue
+
+        created_at = parse_created_at_from_id(task)
+        if created_at:
+            age_hours = (now - created_at).total_seconds() / 3600.0
+            if age_hours >= WEB_ALERT_STALLED_HOURS:
+                alerts.append({"type": "stalled", "title": title, "task_id": task_id})
+
+    return alerts
+
+
+def alert_anchor(task_id):
+    clean = str(task_id or "").strip()
+    return f"task-{clean}" if clean else None
+
+
+def first_alert_target(project, external=False):
+    alerts = project.get("alerts") or []
+    if not alerts:
+        return None
+    anchor = alert_anchor(alerts[0].get("task_id"))
+    if not anchor:
+        return None
+    return f"/tasks#{anchor}" if external else f"#{anchor}"
+
+
+def project_alert_task_ids(project):
+    ids = []
+    for item in project.get("alerts") or []:
+        task_id = str(item.get("task_id") or "").strip()
+        if task_id:
+            ids.append(task_id)
+    return sorted(set(ids))
+
 # === Routes ===
 
 @app.route("/")
@@ -140,6 +249,13 @@ def index():
     projects = data.get("projects", [])
     for project in projects:
         project["display_gaps"] = build_display_gaps(project)
+        project["alerts"] = build_project_alerts(project)
+        project["alert_count"] = len(project["alerts"])
+        project["alert_task_ids"] = project_alert_task_ids(project)
+        project["first_alert_target"] = first_alert_target(project, external=True)
+    alert_count = sum(p.get("alert_count", 0) for p in projects)
+    first_alert_project = next((p for p in projects if p.get("alert_count", 0) > 0), None)
+    alert_target = first_alert_project.get("first_alert_target") if first_alert_project else None
     project_names = [p.get("project_name") for p in projects]
     semester = data.get("semester", {})
     
@@ -150,6 +266,7 @@ def index():
             t_copy = t.copy()
             t_copy["project"] = p["project_name"]
             t_copy["score"] = priority_score(t_copy.get("priority"))
+            t_copy["needs_alert"] = str(t_copy.get("id") or "") in set(p.get("alert_task_ids") or [])
             master_tasks.append(t_copy)
     master_tasks.sort(key=lambda x: (-x["score"], safe_deadline(x)))
     
@@ -157,7 +274,9 @@ def index():
                          project_names=project_names,
                          semester=semester,
                          projects=projects,
-                         master_tasks=master_tasks[:5])  # Preview only
+                         master_tasks=master_tasks[:5],
+                         alert_count=alert_count,
+                         alert_target=alert_target)  # Preview only
 
 @app.route("/tasks")
 def tasks_page():
@@ -166,20 +285,31 @@ def tasks_page():
     projects = data.get("projects", [])
     for project in projects:
         project["display_gaps"] = build_display_gaps(project)
+        project["alerts"] = build_project_alerts(project)
+        project["alert_count"] = len(project["alerts"])
+        project["alert_task_ids"] = project_alert_task_ids(project)
+        project["first_alert_target"] = first_alert_target(project, external=False)
+    alert_count = sum(p.get("alert_count", 0) for p in projects)
+    first_alert_project = next((p for p in projects if p.get("alert_count", 0) > 0), None)
+    alert_target = first_alert_project.get("first_alert_target") if first_alert_project else None
     
     # Build master queue (null-safe sort)
     all_pending = []
     for p in projects:
+        alert_ids = set(p.get("alert_task_ids") or [])
         for t in p.get("pending_tasks", []):
             t_copy = t.copy()
             t_copy["project"] = p["project_name"]
             t_copy["score"] = priority_score(t_copy.get("priority"))
+            t_copy["needs_alert"] = str(t_copy.get("id") or "") in alert_ids
             all_pending.append(t_copy)
     all_pending.sort(key=lambda x: (-x["score"], safe_deadline(x)))
     
     return render_template("tasks.html", 
                          projects=projects, 
-                         master_tasks=all_pending[:20])
+                         master_tasks=all_pending[:20],
+                         alert_count=alert_count,
+                         alert_target=alert_target)
 
 @app.route("/api/semester", methods=["POST"])
 def set_semester():
@@ -378,6 +508,41 @@ def delete_task():
 
     save_state(data)
     return jsonify({"status": "deleted", "project_name": project_name, "task_id": task_id})
+
+
+@app.route("/api/tasks/guidance", methods=["POST"])
+def task_guidance():
+    """Generate concise per-task guidance with caching for snappy UX."""
+    req = request.json or {}
+    project_name = req.get("project_name")
+    task_id = req.get("task_id")
+
+    if not project_name or not task_id:
+        return jsonify({"error": "project_name and task_id are required"}), 400
+
+    data = load_state()
+    project, task = find_task(data, project_name, task_id)
+    if not project or not task:
+        return jsonify({"error": "Task not found"}), 404
+
+    key = guidance_cache_key(project_name, task)
+    cached = get_cached_guidance(key)
+    if cached:
+        return jsonify({"status": "success", **cached, "cached": True})
+
+    try:
+        result = ai.generate_task_guidance(task)
+        payload = {
+            "guidance": result.get("guidance", ""),
+            "fallback": bool(result.get("fallback", False)),
+            "used_model": result.get("used_model"),
+            "task_id": task_id,
+            "project_name": project_name,
+        }
+        set_cached_guidance(key, payload)
+        return jsonify({"status": "success", **payload, "cached": False})
+    except Exception as e:
+        return jsonify({"error": f"Unable to generate guidance: {str(e)}"}), 500
 
 @app.route("/sync-notion", methods=["POST"])
 def sync_notion():

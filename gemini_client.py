@@ -25,6 +25,109 @@ class Mess2MasterAI:
             "models/gemini-2.5-flash",
         ]
 
+    def generate_task_guidance(self, task: dict):
+        """Generate concise, actionable execution guidance for a single task."""
+        title = (task.get("title") or task.get("task") or "Untitled Task").strip()
+        priority = (task.get("priority") or "medium").strip().lower()
+        deadline = (task.get("deadline") or task.get("due_date") or "TBD").strip()
+        owner = (task.get("owner") or "Unassigned").strip()
+
+        prompt = f"""
+        You are a practical student productivity coach.
+
+        Task title: {title}
+        Priority: {priority}
+        Deadline: {deadline}
+        Assignee: {owner}
+
+        Return plain text only, no markdown.
+        Keep it concise and specific.
+        Output exactly this structure:
+        Start now:
+        1) ...
+        2) ...
+        3) ...
+        Optional snippet:
+        ...
+
+        Rules:
+        - Max 3 steps.
+        - Each step must be concrete and actionable.
+        - Add optional snippet only when useful (coding tasks, command, or outline).
+        - Keep total under 120 words.
+        """
+
+        last_error = None
+        for model_name in dict.fromkeys(self.model_fallbacks):
+            try:
+                res = self.client.models.generate_content(
+                    model=model_name,
+                    contents=[prompt],
+                    config=types.GenerateContentConfig(
+                        max_output_tokens=260,
+                        temperature=0.25,
+                    ),
+                )
+                text = (res.text or "").strip()
+                if text:
+                    return {"guidance": text, "used_model": model_name, "fallback": False}
+            except Exception as e:
+                last_error = e
+                error_text = str(e)
+                if "429" in error_text or "RESOURCE_EXHAUSTED" in error_text:
+                    break
+
+        fallback_text = self._fallback_task_guidance(title, priority, deadline)
+        return {
+            "guidance": fallback_text,
+            "used_model": None,
+            "fallback": True,
+            "fallback_reason": str(last_error) if last_error else "model_unavailable",
+        }
+
+    def _fallback_task_guidance(self, title: str, priority: str, deadline: str) -> str:
+        lower = (title or "").lower()
+
+        if any(k in lower for k in ["report", "proposal", "essay", "documentation"]):
+            return (
+                "Start now:\n"
+                "1) Draft a 5-line outline: objective, scope, method, result, next step.\n"
+                "2) Write section 1 fully before polishing anything else.\n"
+                "3) Set a 30-minute review block to tighten wording and references.\n"
+                "Optional snippet:\n"
+                "Outline: Intro -> Method -> Findings -> Conclusion"
+            )
+
+        if any(k in lower for k in ["flask", "backend", "api", "endpoint", "server"]):
+            return (
+                "Start now:\n"
+                "1) Create one endpoint that returns a test JSON response.\n"
+                "2) Wire request/response schema and validate one happy path.\n"
+                "3) Add one failing test case before adding more features.\n"
+                "Optional snippet:\n"
+                "@app.get('/health') -> {'status':'ok'}"
+            )
+
+        if any(k in lower for k in ["presentation", "slides", "pitch"]):
+            return (
+                "Start now:\n"
+                "1) Lock your 3-slide story: problem, solution, proof.\n"
+                "2) Add one concrete demo screenshot or metric per slide.\n"
+                "3) Rehearse a 90-second narration and trim extra details.\n"
+                "Optional snippet:\n"
+                "Slide order: Pain -> Demo -> Impact"
+            )
+
+        urgency = "high-priority" if priority == "high" else "standard"
+        return (
+            "Start now:\n"
+            f"1) Define the first 20-minute {urgency} milestone for '{title}'.\n"
+            "2) Complete one tangible output (draft, commit, or checklist).\n"
+            f"3) Reserve a follow-up block before deadline ({deadline}).\n"
+            "Optional snippet:\n"
+            "Done criteria: one visible output + next action assigned"
+        )
+
     def extract_tasks(self, files: list, notes: str, sem_start: str, sem_end: str,
                       existing_pending: list = None, break_week: int = 8):
         """

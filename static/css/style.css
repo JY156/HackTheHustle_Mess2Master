@@ -328,6 +328,34 @@ button[type="submit"]:disabled, .btn-primary:disabled, .btn-sync-notion:disabled
     transform: scale(1.08);
 }
 
+.task-quick-actions {
+    display: inline-flex;
+    gap: 0.4rem;
+    align-items: center;
+}
+
+.btn-guidance-icon {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 8px;
+    background: rgba(242, 168, 59, 0.15);
+    color: #b26f00;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+}
+
+.btn-guidance-icon:hover {
+    background: #f2a83b;
+    color: #fff;
+    transform: scale(1.08);
+}
+
 /* === STATUS MESSAGES === */
 .submit-status, .sync-status {
     min-height: 1.15rem;

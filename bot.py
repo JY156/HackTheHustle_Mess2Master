@@ -2,6 +2,7 @@ import os
 import re
 import json
 import time
+import asyncio
 from collections import deque
 from html import escape as html_escape
 from io import BytesIO
@@ -16,6 +17,7 @@ from telegram.error import BadRequest
 from telegram.ext import (
     ApplicationBuilder,
     CallbackQueryHandler,
+    CommandHandler,
     ContextTypes,
     MessageHandler,
     filters,
@@ -27,6 +29,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 load_dotenv(os.path.join(os.path.dirname(BASE_DIR), ".env"))
 STATE_FILE = os.path.join(BASE_DIR, "data", "mess2master_state.json")
+REMINDER_STATE_FILE = os.path.join(BASE_DIR, "data", "bot_reminder_state.json")
 
 ai = Mess2MasterAI()
 TRIGGERS = [
@@ -45,11 +48,276 @@ STRONG_SIGNAL_WORDS = ["due", "by", "friday", "monday", "assign", "need to", "fi
 TASK_SPLIT_RE = re.compile(r"\s+(?:and also|also|and then|plus|,\s+and|;|\.|\n)\s+", re.I)
 AMBIGUOUS_TITLES = {"this", "that", "it", "do this", "do that", "follow up", "the task"}
 ASSIGNEE_SUGGESTION_THRESHOLD = 3
+REMINDER_SCAN_INTERVAL_SEC = int(os.getenv("REMINDER_SCAN_INTERVAL_SEC", "600"))
+REMINDER_NEAR_DEADLINE_HOURS = int(os.getenv("REMINDER_NEAR_DEADLINE_HOURS", "24"))
+REMINDER_STALLED_HOURS = int(os.getenv("REMINDER_STALLED_HOURS", "48"))
+MAX_REMINDERS_PER_SCAN = int(os.getenv("MAX_REMINDERS_PER_SCAN", "3"))
+WEB_APP_BASE_URL = (os.getenv("WEB_APP_BASE_URL") or "http://127.0.0.1:5000").rstrip("/")
 SKILL_HINTS = {
     "writing": ["report", "draft", "write", "slides", "documentation"],
     "design": ["ui", "design", "wireframe", "frontend", "prototype"],
     "backend": ["api", "backend", "database", "schema", "auth"],
 }
+REMINDER_LOOP_TASK = None
+
+
+def load_reminder_state() -> dict:
+    if not os.path.exists(REMINDER_STATE_FILE):
+        return {"subscribed_chats": [], "sent": {}}
+    try:
+        with open(REMINDER_STATE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if not isinstance(data, dict):
+                return {"subscribed_chats": [], "sent": {}}
+            data.setdefault("subscribed_chats", [])
+            data.setdefault("sent", {})
+            return data
+    except Exception:
+        return {"subscribed_chats": [], "sent": {}}
+
+
+def save_reminder_state(data: dict):
+    os.makedirs(os.path.dirname(REMINDER_STATE_FILE), exist_ok=True)
+    with open(REMINDER_STATE_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+
+def is_unassigned(owner_value: str | None) -> bool:
+    owner = str(owner_value or "").strip().lower()
+    return (not owner) or owner == "unassigned"
+
+
+def parse_task_deadline(task: dict) -> datetime | None:
+    raw = str(task.get("deadline") or task.get("due_date") or "").strip()
+    if not raw:
+        return None
+
+    for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M", "%Y-%m-%d"):
+        try:
+            dt = datetime.strptime(raw, fmt)
+            if fmt == "%Y-%m-%d":
+                return dt.replace(hour=23, minute=59)
+            return dt
+        except ValueError:
+            continue
+    return None
+
+
+def parse_task_created_at(task: dict) -> datetime | None:
+    task_id = str(task.get("id") or "")
+    m = re.match(r"^ts_(\d{9,12})", task_id)
+    if not m:
+        return None
+    try:
+        return datetime.fromtimestamp(int(m.group(1)))
+    except Exception:
+        return None
+
+
+def project_slug(name: str) -> str:
+    return re.sub(r"\s+", "-", (name or "").strip())
+
+
+def website_project_url(project_name: str) -> str:
+    slug = project_slug(project_name)
+    return f"{WEB_APP_BASE_URL}/tasks#{quote(slug)}" if slug else f"{WEB_APP_BASE_URL}/tasks"
+
+
+def reminder_assign_callback(task_key: str) -> str:
+    safe = re.sub(r"[^a-zA-Z0-9_\-]", "", (task_key or ""))[:50]
+    return f"rem_assign:{safe}"
+
+
+def build_reminder_markup(item: dict) -> InlineKeyboardMarkup:
+    row = [
+        InlineKeyboardButton("👤 Assign in Telegram", callback_data=reminder_assign_callback(item.get("task_key") or "")),
+        InlineKeyboardButton("🌐 Open website project", url=website_project_url(item.get("project") or "")),
+    ]
+    return InlineKeyboardMarkup([row])
+
+
+def find_task_in_website_state(task_key: str):
+    state = load_website_state()
+    for project in state.get("projects", []):
+        for task in project.get("pending_tasks", []) or []:
+            current_id = str(task.get("id") or "")
+            if current_id and current_id == task_key:
+                return project, task
+    return None, None
+
+
+def build_reminder_candidates(state_data: dict) -> list[dict]:
+    now = datetime.now()
+    reminders = []
+    for project in state_data.get("projects", []):
+        project_name = project.get("project_name") or "Untitled"
+        for task in project.get("pending_tasks", []) or []:
+            title = str(task.get("title") or task.get("task") or "Untitled").strip()
+            owner = task.get("owner")
+            deadline_dt = parse_task_deadline(task)
+            created_at = parse_task_created_at(task)
+            task_key_value = str(task.get("id") or f"{title}|{task.get('deadline') or task.get('due_date') or ''}")
+
+            if is_unassigned(owner) and deadline_dt:
+                delta_hours = (deadline_dt - now).total_seconds() / 3600.0
+                if 0 <= delta_hours <= REMINDER_NEAR_DEADLINE_HOURS:
+                    hours_left = max(1, int(round(delta_hours)))
+                    reminders.append({
+                        "rule": "unassigned_due_soon",
+                        "task_key": task_key_value,
+                        "task_id": str(task.get("id") or ""),
+                        "project": project_name,
+                        "title": title,
+                        "message": f"⚠️ '{title}' is unassigned and due in about {hours_left}h. Assign now?",
+                    })
+                elif delta_hours < 0:
+                    reminders.append({
+                        "rule": "overdue_unassigned",
+                        "task_key": task_key_value,
+                        "task_id": str(task.get("id") or ""),
+                        "project": project_name,
+                        "title": title,
+                        "message": f"🚨 '{title}' is overdue and still unassigned. Assign ownership immediately.",
+                    })
+
+            if is_unassigned(owner) and not deadline_dt and created_at:
+                age_hours = (now - created_at).total_seconds() / 3600.0
+                if age_hours >= REMINDER_STALLED_HOURS:
+                    reminders.append({
+                        "rule": "stalled_unassigned",
+                        "task_key": task_key_value,
+                        "task_id": str(task.get("id") or ""),
+                        "project": project_name,
+                        "title": title,
+                        "message": f"🕒 '{title}' has no assignee and no deadline for over {REMINDER_STALLED_HOURS}h.",
+                    })
+    return reminders
+
+
+async def run_reminder_scan(bot, force: bool = False) -> int:
+    reminder_state = load_reminder_state()
+    subscribed = [int(cid) for cid in reminder_state.get("subscribed_chats", [])]
+    if not subscribed:
+        return 0
+
+    app_state = load_website_state()
+    candidates = build_reminder_candidates(app_state)
+    if not candidates:
+        return 0
+
+    sent_map = reminder_state.setdefault("sent", {})
+    sent_count = 0
+
+    for chat_id in subscribed:
+        chat_items = []
+        for item in candidates:
+            item_key = item.get("task_id") or item.get("task_key")
+            dedupe_key = f"{chat_id}|{item['rule']}|{item_key}"
+            if (not force) and dedupe_key in sent_map:
+                continue
+            chat_items.append((dedupe_key, item))
+            if len(chat_items) >= MAX_REMINDERS_PER_SCAN:
+                break
+
+        if not chat_items:
+            continue
+
+        try:
+            now_iso = datetime.now().isoformat()
+            for dedupe_key, item in chat_items:
+                text = (
+                    "<b>🧠 Proactive AI Reminder</b>\n"
+                    f"<b>{html_escape(item['project'])}</b>\n"
+                    f"{html_escape(item['message'])}\n\n"
+                    "Take action now to prevent last-minute fire drills."
+                )
+                await bot.send_message(
+                    chat_id=chat_id,
+                    text=text,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=build_reminder_markup(item),
+                )
+                sent_map[dedupe_key] = now_iso
+                sent_count += 1
+        except Exception as exc:
+            print(f"Reminder send failed for chat {chat_id}: {exc}")
+
+    save_reminder_state(reminder_state)
+    return sent_count
+
+
+async def reminder_loop(application):
+    while True:
+        try:
+            await run_reminder_scan(application.bot)
+        except Exception as exc:
+            print(f"Reminder scan error: {exc}")
+        await asyncio.sleep(max(60, REMINDER_SCAN_INTERVAL_SEC))
+
+
+async def remind_on(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat = update.effective_chat
+    if not chat or not update.effective_message:
+        return
+    reminder_state = load_reminder_state()
+    subscribed = set(int(cid) for cid in reminder_state.get("subscribed_chats", []))
+    subscribed.add(chat.id)
+    reminder_state["subscribed_chats"] = sorted(subscribed)
+    save_reminder_state(reminder_state)
+    await update.effective_message.reply_text(
+        "✅ Proactive reminders enabled for this chat.\n"
+        "I will alert on unassigned due-soon, overdue, and stalled tasks."
+    )
+
+
+async def remind_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat = update.effective_chat
+    if not chat or not update.effective_message:
+        return
+    reminder_state = load_reminder_state()
+    reminder_state["subscribed_chats"] = [int(cid) for cid in reminder_state.get("subscribed_chats", []) if int(cid) != chat.id]
+    save_reminder_state(reminder_state)
+    await update.effective_message.reply_text("🛑 Proactive reminders disabled for this chat.")
+
+
+async def remind_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat = update.effective_chat
+    if not chat or not update.effective_message:
+        return
+    reminder_state = load_reminder_state()
+    subscribed = set(int(cid) for cid in reminder_state.get("subscribed_chats", []))
+    enabled = chat.id in subscribed
+    sent_total = len(reminder_state.get("sent", {}))
+    await update.effective_message.reply_text(
+        f"Reminder status: {'ON' if enabled else 'OFF'}\n"
+        f"Scan interval: {REMINDER_SCAN_INTERVAL_SEC // 60} min\n"
+        f"Near-deadline window: {REMINDER_NEAR_DEADLINE_HOURS}h\n"
+        f"Total deduped alerts recorded: {sent_total}"
+    )
+
+
+async def remind_scan(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.effective_message:
+        return
+    sent = await run_reminder_scan(context.bot, force=True)
+    await update.effective_message.reply_text(f"✅ Manual reminder scan complete. Sent {sent} alert(s).")
+
+
+async def on_post_init(application):
+    global REMINDER_LOOP_TASK
+    if REMINDER_LOOP_TASK is None or REMINDER_LOOP_TASK.done():
+        REMINDER_LOOP_TASK = asyncio.create_task(reminder_loop(application))
+
+
+async def on_post_shutdown(application):
+    global REMINDER_LOOP_TASK
+    if REMINDER_LOOP_TASK and not REMINDER_LOOP_TASK.done():
+        REMINDER_LOOP_TASK.cancel()
+        try:
+            await REMINDER_LOOP_TASK
+        except asyncio.CancelledError:
+            pass
+    REMINDER_LOOP_TASK = None
 
 
 def normalize_alias_key(value: str) -> str:
@@ -922,6 +1190,40 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     data = query.data or ""
+    if data.startswith("rem_assign:") and query.message:
+        chat_id = query.message.chat_id
+        reminder_task_key = data.split(":", 1)[1].strip()
+        project, website_task = find_task_in_website_state(reminder_task_key)
+        if not project or not website_task:
+            await query.answer("Task no longer found. Refresh reminders with /remind_scan", show_alert=True)
+            return
+
+        task = {
+            "id": website_task.get("id"),
+            "title": website_task.get("title") or website_task.get("task") or "Untitled",
+            "description": website_task.get("description") or "",
+            "due_date": website_task.get("deadline") or website_task.get("due_date") or "",
+            "owner": website_task.get("owner") or "Unassigned",
+            "priority": website_task.get("priority") or "medium",
+        }
+        CHAT_STATE[chat_id] = {
+            "message_id": query.message.message_id,
+            "tasks": [task],
+            "task_keys": {task_key(task)},
+            "project_name": project.get("project_name") or "Telegram Inbox",
+        }
+
+        await edit_message_text_safe(
+            context,
+            chat_id=chat_id,
+            message_id=query.message.message_id,
+            text=format_task_list_message("✨ Assign This Task", [task], task.get("description") or ""),
+            parse_mode=ParseMode.HTML,
+            reply_markup=build_actions_markup(task),
+        )
+        await query.answer("Reply: assign to @username", show_alert=False)
+        return
+
     if data == "dismiss_card" and query.message:
         chat_id = query.message.chat_id
         await query.message.delete()
@@ -996,7 +1298,11 @@ def main():
     if not token:
         raise ValueError("TELEGRAM_BOT_TOKEN is missing. Add it to your .env before running bot.py")
 
-    app = ApplicationBuilder().token(token).build()
+    app = ApplicationBuilder().token(token).post_init(on_post_init).post_shutdown(on_post_shutdown).build()
+    app.add_handler(CommandHandler("remind_on", remind_on))
+    app.add_handler(CommandHandler("remind_off", remind_off))
+    app.add_handler(CommandHandler("remind_status", remind_status))
+    app.add_handler(CommandHandler("remind_scan", remind_scan))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
     app.add_handler(CallbackQueryHandler(handle_callback))

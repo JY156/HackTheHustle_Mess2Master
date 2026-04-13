@@ -52,6 +52,73 @@ function filterTasks(projectSlug) {
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Tasks.js loaded');
 
+    const guidanceModal = document.getElementById('guidanceModal');
+    const guidanceBody = document.getElementById('guidanceBody');
+    const guidanceTaskTitle = document.getElementById('guidanceTaskTitle');
+    const closeGuidanceModal = document.getElementById('closeGuidanceModal');
+
+    function showGuidanceModal(title, bodyText) {
+        if (!guidanceModal || !guidanceBody || !guidanceTaskTitle) return;
+        guidanceTaskTitle.textContent = title ? `Task: ${title}` : '';
+        guidanceBody.textContent = bodyText || 'No guidance available.';
+        guidanceModal.style.display = 'flex';
+    }
+
+    function hideGuidanceModal() {
+        if (guidanceModal) guidanceModal.style.display = 'none';
+    }
+
+    closeGuidanceModal?.addEventListener('click', hideGuidanceModal);
+    guidanceModal?.addEventListener('click', (e) => {
+        if (e.target === guidanceModal) hideGuidanceModal();
+    });
+
+    document.querySelectorAll('[data-guidance-task]').forEach((button) => {
+        button.addEventListener('click', async () => {
+            const projectName = button.dataset.project;
+            const taskId = button.dataset.taskId;
+            const taskTitle = button.dataset.taskTitle || 'Task';
+            if (!projectName || !taskId) return;
+
+            const originalHtml = button.innerHTML;
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+            try {
+                const res = await fetch('/api/tasks/guidance', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ project_name: projectName, task_id: taskId }),
+                });
+                const data = await res.json();
+                if (!res.ok || data.status !== 'success') {
+                    throw new Error(data.error || 'Unable to generate guidance');
+                }
+                showGuidanceModal(taskTitle, data.guidance || 'No guidance available.');
+            } catch (err) {
+                console.error(err);
+                showGuidanceModal(taskTitle, `Unable to generate guidance right now.\n${err.message}`);
+            } finally {
+                button.disabled = false;
+                button.innerHTML = originalHtml;
+            }
+        });
+    });
+
+    document.querySelectorAll('.alert-jump').forEach(marker => {
+        marker.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const target = marker.dataset.alertTarget;
+            if (!target) return;
+            window.location.hash = target.replace('#', '');
+            const targetEl = document.querySelector(target);
+            if (targetEl) {
+                targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        });
+    });
+
     function setNotionSuccessStatus(statusEl, syncedCount, dashboardUrl) {
         if (!statusEl) return;
         statusEl.className = 'sync-status success';
