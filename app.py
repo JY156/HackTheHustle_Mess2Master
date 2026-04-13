@@ -418,7 +418,6 @@ def process_upload():
         if project:
             project["pending_tasks"] = merged_tasks
             project["gaps"] = result.get("gaps", [])
-            project["sync_score"] = result.get("sync_score", 75)
             project["cross_insights"] = result.get("cross_insights", [])
             # Keep most recently updated project at the end for homepage "recent" rendering.
             data["projects"] = [p for p in data["projects"] if p.get("project_name") != project_name] + [project]
@@ -428,7 +427,6 @@ def process_upload():
                 "pending_tasks": merged_tasks,
                 "completed_tasks": [],
                 "gaps": result.get("gaps", []),
-                "sync_score": result.get("sync_score", 75),
                 "cross_insights": result.get("cross_insights", [])
             })
         
@@ -639,8 +637,8 @@ def sync_notion():
 
         if synced_count > 0:
             return jsonify({
-                "status": "success", 
-                "synced_count": synced_count, 
+                "status": "success",
+                "synced_count": synced_count,
                 "total_tasks": len([t for p in projects_to_sync for t in p.get("pending_tasks", [])]),
                 "errors": errors,
                 "dashboard_url": notion_dashboard_url(),

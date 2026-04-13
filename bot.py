@@ -860,7 +860,6 @@ def sync_tasks_to_website(tasks: list[dict], project_name: str) -> dict:
             "pending_tasks": [],
             "completed_tasks": [],
             "gaps": [],
-            "sync_score": 75,
             "cross_insights": [],
         }
         projects.append(project)
