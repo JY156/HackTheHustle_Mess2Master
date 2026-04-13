@@ -1,0 +1,251 @@
+{
+  "semester": {
+    "start": "2026-03-09",
+    "end": "2026-06-21",
+    "break_week": 8
+  },
+  "projects": [
+    {
+      "project_name": "WIA2004 OS",
+      "pending_tasks": [
+        {
+          "id": "ts_1775900415",
+          "title": "Setup Project Repository",
+          "description": "Initialize git and README",
+          "deadline": "2026-03-09",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Team Lead",
+          "follow_up": "Confirm repository name and assign first owner"
+        },
+        {
+          "id": "ts_1775900529",
+          "title": "Setup Project Repository",
+          "description": "Initialize git and README",
+          "deadline": "2026-03-09",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Team Lead",
+          "follow_up": "Confirm repository name and assign first owner"
+        }
+      ],
+      "completed_tasks": [],
+      "gaps": [
+        {
+          "issue": "Missing methodology section",
+          "suggestion": "Schedule 1hr meeting to align on approach"
+        }
+      ],
+      "sync_score": 75,
+      "cross_insights": [
+        "Reuse literature review template from previous course"
+      ]
+    },
+    {
+      "project_name": "WIF2003 WP",
+      "pending_tasks": [
+        {
+          "id": "ts_1775901756",
+          "title": "Setup Project Repository",
+          "description": "Initialize git and README",
+          "deadline": "2026-03-09",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Team Lead",
+          "follow_up": "Confirm repository name and assign first owner"
+        },
+        {
+          "id": "ts_1775904170",
+          "title": "Setup Project Repository",
+          "description": "Initialize git and README",
+          "deadline": "2026-03-09",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Team Lead",
+          "follow_up": "Confirm repository name and assign first owner"
+        }
+      ],
+      "completed_tasks": [],
+      "gaps": [
+        {
+          "issue": "Missing methodology section",
+          "suggestion": "Schedule 1hr meeting to align on approach"
+        }
+      ],
+      "sync_score": 75,
+      "cross_insights": [
+        "Reuse literature review template from previous course"
+      ]
+    },
+    {
+      "project_name": "WIF2002 SRE",
+      "pending_tasks": [
+        {
+          "id": "ts_1775903508",
+          "title": "Setup Project Repository",
+          "description": "Initialize git and README",
+          "deadline": "2026-03-09",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Team Lead",
+          "follow_up": "Confirm repository name and assign first owner"
+        }
+      ],
+      "completed_tasks": [],
+      "gaps": [
+        {
+          "issue": "Missing methodology section",
+          "suggestion": "Schedule 1hr meeting to align on approach"
+        }
+      ],
+      "sync_score": 75,
+      "cross_insights": [
+        "Reuse literature review template from previous course"
+      ]
+    },
+    {
+      "project_name": "WIA2003",
+      "pending_tasks": [
+        {
+          "id": "ts_1775904929",
+          "title": "Setup Project Repository",
+          "description": "Initialize git and README",
+          "deadline": "2026-03-09",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Team Lead",
+          "follow_up": "Confirm repository name and assign first owner"
+        }
+      ],
+      "completed_tasks": [],
+      "gaps": [
+        {
+          "issue": "Missing methodology section",
+          "suggestion": "Schedule 1hr meeting to align on approach"
+        }
+      ],
+      "sync_score": 75,
+      "cross_insights": [
+        "Reuse literature review template from previous course"
+      ]
+    },
+    {
+      "project_name": "Voice Meeting",
+      "pending_tasks": [
+        {
+          "id": "ts_1775917069",
+          "title": "Setup Project Repository",
+          "description": "Initialize git and README",
+          "deadline": "2026-03-09",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Team Lead",
+          "follow_up": "Confirm repository name and assign first owner"
+        },
+        {
+          "id": "ts_1775919168_0",
+          "title": "Initialize the github repo and invite everyone",
+          "description": "initialize the github repo and invite everyone",
+          "deadline": "2026-03-22",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": null,
+          "follow_up": "Assign owner"
+        },
+        {
+          "id": "ts_1775919265_0",
+          "title": "Initialize the github rapper and invite everyone",
+          "description": "initialize the github rapper and invite everyone",
+          "deadline": "2026-03-22",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": null,
+          "follow_up": "Assign owner"
+        },
+        {
+          "id": "ts_1775920121_0",
+          "title": "Pick our official project title from the lectures list",
+          "description": "pick our official project title from the lectures list",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": null,
+          "follow_up": "Assign owner"
+        },
+        {
+          "id": "ts_1775920121_1",
+          "title": "The wire frames for the law in and user dashboard",
+          "description": "the wire frames for the law in and user dashboard",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Mike",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1775920121_2",
+          "title": "Used Mongo TB",
+          "description": "used Mongo TB",
+          "deadline": "2026-04-15",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": "John",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1775920121_3",
+          "title": "Submit peer evaluation forms",
+          "description": "Submit peer evaluation forms",
+          "deadline": "2026-04-30",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": null,
+          "follow_up": "Assign owner"
+        }
+      ],
+      "completed_tasks": [],
+      "gaps": [
+        {
+          "issue": "Some tasks may still miss clear owners/dates",
+          "suggestion": "Add explicit 'Owner + by Date' phrasing for each action item"
+        }
+      ],
+      "sync_score": 70,
+      "cross_insights": [
+        "Fallback parsing used transcript-only extraction due to model unavailability"
+      ]
+    },
+    {
+      "project_name": "API Documentation",
+      "pending_tasks": [
+        {
+          "id": "ts_1776050519_9403",
+          "title": "Finish API docs",
+          "description": "Need to finish API docs by Friday 5pm",
+          "deadline": "2026-04-17 17:00",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Unassigned",
+          "follow_up": null
+        }
+      ],
+      "completed_tasks": [],
+      "gaps": [],
+      "sync_score": 75,
+      "cross_insights": []
+    }
+  ]
+}

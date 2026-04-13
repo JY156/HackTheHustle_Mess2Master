@@ -16,16 +16,13 @@ class Mess2MasterAI:
         self.client = genai.Client(api_key=api_key)
         
         # ✅ Model fallback chain (Main's robustness)
-        self.model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+        self.model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
         self.model_fallbacks = [
             self.model,
-            "gemini-2.5-flash",
-            "models/gemini-2.5-flash",
             "gemini-2.5-flash-lite",
             "models/gemini-2.5-flash-lite",
-            "gemini-1.5-flash",      # Older, but has a fresh bucket of free requests!
-            "gemini-1.5-flash-8b",   # The older "lite" version
             "gemini-2.5-flash",
+            "models/gemini-2.5-flash",
         ]
 
     def generate_task_guidance(self, task: dict):
@@ -63,56 +60,13 @@ class Mess2MasterAI:
         last_error = None
         for model_name in dict.fromkeys(self.model_fallbacks):
             try:
-                # 1. Define the exact JSON structure we want
-                extraction_schema = {
-                    "type": "OBJECT",
-                    "properties": {
-                        "project_name": {"type": "STRING"},
-                        "tasks": {
-                            "type": "ARRAY",
-                            "items": {
-                                "type": "OBJECT",
-                                "properties": {
-                                    "id": {"type": "STRING"},
-                                    "title": {"type": "STRING"},
-                                    "description": {"type": "STRING"},
-                                    "deadline": {"type": "STRING", "nullable": True},
-                                    "due_date_source": {"type": "STRING"},
-                                    "priority": {"type": "STRING"},
-                                    "status": {"type": "STRING"},
-                                    "owner": {"type": "STRING", "nullable": True},
-                                    "follow_up": {"type": "STRING", "nullable": True}
-                                }
-                            }
-                        },
-                        "gaps": {
-                            "type": "ARRAY",
-                            "items": {
-                                "type": "OBJECT",
-                                "properties": {
-                                    "issue": {"type": "STRING"},
-                                    "suggestion": {"type": "STRING"}
-                                }
-                            }
-                        },
-                        "cross_insights": {
-                            "type": "ARRAY",
-                            "items": {"type": "STRING"}
-                        }
-                    },
-                    "required": ["project_name", "tasks", "gaps", "cross_insights"]
-                }
-
-                # 2. Pass it into the GenerateContentConfig
                 res = self.client.models.generate_content(
                     model=model_name,
-                    contents=contents + [prompt],
+                    contents=[prompt],
                     config=types.GenerateContentConfig(
-                        response_mime_type="application/json",
-                        response_schema=extraction_schema, # 🚀 THIS FORCES PERFECT JSON
-                        max_output_tokens=4000,
-                        temperature=0.2,
-                    )
+                        max_output_tokens=260,
+                        temperature=0.25,
+                    ),
                 )
                 text = (res.text or "").strip()
                 if text:
@@ -202,58 +156,41 @@ class Mess2MasterAI:
         # === File Processing: PDF Text Extraction + Multimodal Fallback ===
         for file in files:
             try:
-                filename = getattr(file, "filename", "") or "uploaded_file"
+                filename = getattr(file, "filename", "") or ""
                 ext = filename.rsplit('.', 1)[-1].lower() if "." in filename else ""
+                mime = getattr(file, "mimetype", None) or mime_map.get(ext, 'application/octet-stream')
                 file_bytes = file.read()
-                
-                # 1. FORCE PDF CHECK FIRST (Bypass MIME type issues entirely)
-                pdf_extracted = False
-                try:
-                    pdf_reader = PdfReader(BytesIO(file_bytes))
-                    extracted_pages = []
-                    for page in pdf_reader.pages[:5]:  # Limit to first 5 pages
-                        page_text = page.extract_text() or ""
-                        if page_text.strip():
-                            extracted_pages.append(page_text.strip())
-                    
-                    extracted_text = "\n\n".join(extracted_pages).strip()
-                    if extracted_text:
-                        diagnostics["pdf_text_extracted"] = True
-                        contents.append(
-                            f"FILE: {filename}\nTYPE: pdf\nEXTRACTED_TEXT:\n{extracted_text[:12000]}"
-                        )
-                        pdf_extracted = True
-                except Exception:
-                    pass # Not a readable PDF, move to standard MIME check
+                is_pdf = (ext == 'pdf') or (mime == 'application/pdf')
 
-                # If we successfully extracted PDF text, skip the rest of the loop!
-                if pdf_extracted:
-                    continue
+                # Special handling for PDFs: extract text first (better for task extraction)
+                if is_pdf:
+                    try:
+                        pdf_reader = PdfReader(BytesIO(file_bytes))
+                        extracted_pages = []
+                        for page in pdf_reader.pages[:5]:  # Limit to first 5 pages
+                            page_text = page.extract_text() or ""
+                            if page_text.strip():
+                                extracted_pages.append(page_text.strip())
+                        
+                        extracted_text = "\n\n".join(extracted_pages).strip()
+                        if extracted_text:
+                            diagnostics["pdf_text_extracted"] = True
+                            # Send extracted text as plain content (more reliable for task parsing)
+                            contents.append(
+                                f"FILE: {file.filename}\nTYPE: pdf\nEXTRACTED_TEXT:\n{extracted_text[:12000]}"
+                            )
+                            continue  # Skip adding raw PDF bytes if text extraction succeeded
+                    except Exception as pdf_error:
+                        print(f"⚠️ PDF text extraction failed for {file.filename}: {pdf_error}")
+                        # Fallback: send raw PDF bytes for Gemini's native PDF understanding
 
-                # 2. Standard MIME Check for Images/Audio/Text
-                mime = getattr(file, "mimetype", None)
-                
-                # If the web server calls it octet-stream or None, try to guess from extension
-                if not mime or mime == 'application/octet-stream':
-                    mime = mime_map.get(ext, 'text/plain')
-
-                supported_mimes = [
-                    'application/pdf', 'text/plain', 'text/csv', 'text/html', 'text/markdown', 
-                    'image/png', 'image/jpeg', 'image/webp', 'image/heic', 'image/heif',
-                    'audio/wav', 'audio/mp3', 'audio/aiff', 'audio/aac', 'audio/ogg', 'audio/flac'
-                ]
-
-                if mime not in supported_mimes:
-                    print(f"⚠️ Skipping file {filename}: Unsupported format ({mime})")
-                    continue 
-
-                # Truncate large files
-                if len(file_bytes) > 2_000_000:
+                # Truncate large non-PDF files to avoid token limits
+                if not is_pdf and len(file_bytes) > 2_000_000:
                     file_bytes = file_bytes[:2_000_000]
 
                 contents.append(types.Part.from_bytes(data=file_bytes, mime_type=mime))
             except Exception as e:
-                print(f"⚠️ Skipping file {getattr(file, 'filename', 'unknown')}: {e}")
+                print(f"⚠️ Skipping file {file.filename}: {e}")
 
         # === Prepare Merge Context ===
         existing_json = json.dumps(existing_pending[:5] if existing_pending else [], indent=2)
@@ -269,7 +206,7 @@ class Mess2MasterAI:
         EXISTING PENDING TASKS (PRESERVE THESE - DO NOT OVERWRITE):
         {existing_json}
         
-        NEW INPUT: {len(files)} file(s) + notes: "{notes}"
+        NEW INPUT: {len(files)} file(s) + notes: "{notes[:400]}"
         
         OUTPUT STRICT JSON ONLY. NO MARKDOWN. NO EXTRA TEXT.
         {{
@@ -288,6 +225,7 @@ class Mess2MasterAI:
                 }}
             ],
             "gaps": [{{"issue": "string", "suggestion": "string"}}],
+            "sync_score": 0-100,
             "cross_insights": ["string"]
         }}
         
@@ -299,7 +237,7 @@ class Mess2MasterAI:
         5. REMOVE tasks only if input explicitly says "cancelled" or "removed".
         6. If deadline is not explicit, set due_date_source="suggested" and provide reasonable estimate.
         7. Be specific: "Implement login UI with email/password" not "Do frontend".
-        8. Extract ALL explicit assignments and deliverables. If a schedule lists recurring deliverables (e.g., weekly lab reports, code submissions), extract each week's deliverables as separate tasks. Do not artificially limit the total number of tasks.
+        8. Keep tasks concise: 3-8 tasks max, 1-3 sentence descriptions.
         """
 
         # === Model Fallback Chain (Main's reliability) ===
@@ -308,117 +246,95 @@ class Mess2MasterAI:
 
         for model_name in dict.fromkeys(self.model_fallbacks):  # Remove duplicates
             tried_models.append(model_name)
-            
-            # 🚀 NEW: Give the model 2 attempts to get the JSON right
-            max_attempts = 2 if "lite" in model_name else 1 
-            
-            for attempt in range(max_attempts):
-                try:
-                    res = self.client.models.generate_content(
-                        model=model_name,
-                        contents=contents + [prompt],
-                        config=types.GenerateContentConfig(
-                            response_mime_type="application/json",
-                            max_output_tokens=800,
-                            temperature=0.2, # Low temp keeps JSON more stable
-                        )
+            try:
+                res = self.client.models.generate_content(
+                    model=model_name,
+                    contents=contents + [prompt],
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        max_output_tokens=800,
+                        temperature=0.2,
                     )
-                    diagnostics["used_model"] = model_name
-                    
-                    # Parse JSON with markdown cleanup
-                    raw = (res.text or "").strip()
-                    if raw.startswith("```"):
-                        raw = raw.split("```")[1].replace("json", "").strip()
-                    
-                    try:
-                        parsed = json.loads(raw)
-                    except json.JSONDecodeError as e:
-                        # Fallback: extract JSON substring
-                        start = raw.find("{")
-                        end = raw.rfind("}")
-                        if start != -1 and end != -1 and end > start:
-                            try:
-                                parsed = json.loads(raw[start:end + 1])
-                            except json.JSONDecodeError:
-                                print(f"⚠️ JSON typo from {model_name} (Attempt {attempt+1}/{max_attempts}). Retrying...")
-                                last_error = e
-                                continue # 🚀 If it fails, jump back to the top of the attempt loop
-                        else:
-                            print(f"⚠️ JSON typo from {model_name} (Attempt {attempt+1}/{max_attempts}). Retrying...")
-                            last_error = e
-                            continue
-                    
-                    # ✅ Enforce task schema + IDs (Only runs if JSON parsing succeeds)
-                    if isinstance(parsed, dict) and "tasks" in parsed:
-                        for task in parsed["tasks"]:
-                            if not task.get("id"):
-                                task["id"] = f"ts_{int(time.time())}_{hash(task.get('title', '')) % 10000}"
-                            task["status"] = "pending"  
-                            task["deadline"] = task.get("deadline") or task.get("due_date")  
-                            if not task.get("due_date_source"):
-                                task["due_date_source"] = "suggested" if task.get("deadline") else "null"
+                )
+                diagnostics["used_model"] = model_name
+                
+                # Parse JSON with markdown cleanup
+                raw = (res.text or "").strip()
+                if raw.startswith("```"):
+                    raw = raw.split("```")[1].replace("json", "").strip()
+                
+                try:
+                    parsed = json.loads(raw)
+                except json.JSONDecodeError:
+                    # Fallback: extract JSON substring
+                    start = raw.find("{")
+                    end = raw.rfind("}")
+                    if start != -1 and end != -1 and end > start:
+                        parsed = json.loads(raw[start:end + 1])
+                    else:
+                        raise ValueError("Model returned non-JSON output")
+                
+                # ✅ Enforce task schema + IDs
+                if isinstance(parsed, dict) and "tasks" in parsed:
+                    for task in parsed["tasks"]:
+                        if not task.get("id"):
+                            task["id"] = f"ts_{int(time.time())}_{hash(task.get('title', '')) % 10000}"
+                        task["status"] = "pending"  # Enforce status
+                        task["deadline"] = task.get("deadline") or task.get("due_date")  # Field name compatibility
+                        if not task.get("due_date_source"):
+                            task["due_date_source"] = "suggested" if task.get("deadline") else "null"
 
-                        # Voice meeting notes heuristic merge
-                        heuristic_tasks = self._extract_tasks_from_notes(notes, sem_start)
-                        parsed["tasks"] = self._merge_task_lists(parsed["tasks"], heuristic_tasks)
-                        
-                        parsed["_meta"] = diagnostics
-                        return parsed # SUCCESS! Return the data and exit the function.
-                        
-                except Exception as e:
-                    last_error = e
-                    error_text = str(e)
-                    print(f"❌ AI Error with {model_name}: {error_text}")
+                    # Voice meeting notes often need more deterministic splitting than the model gives.
+                    heuristic_tasks = self._extract_tasks_from_notes(notes, sem_start)
+                    parsed["tasks"] = self._merge_task_lists(parsed["tasks"], heuristic_tasks)
                     
-                    # Stop on quota errors
-                    if "429" in error_text or "RESOURCE_EXHAUSTED" in error_text or "spending cap" in error_text.lower():
-                        diagnostics["used_model"] = model_name
-                        return self._fallback(sem_start, notes=notes, reason=error_text, diagnostics=diagnostics)
+                    parsed["_meta"] = diagnostics
+                    return parsed
                     
-                    # If it's a 503 or 404, break out of the attempt loop and move to the next model
-                    if "503" in error_text or "404" in error_text:
-                        break
+            except Exception as e:
+                last_error = e
+                error_text = str(e)
+                print(f"❌ AI Error with {model_name}: {error_text}")
+                
+                # Stop on quota errors (don't waste retries)
+                if "429" in error_text or "RESOURCE_EXHAUSTED" in error_text or "spending cap" in error_text.lower():
+                    diagnostics["used_model"] = model_name
+                    return self._fallback(sem_start, notes=notes, reason=error_text, diagnostics=diagnostics)
+                # Continue to next model on 404/not found
+                if "404" in error_text or "NOT_FOUND" in error_text or "no longer available" in error_text:
+                    continue
 
         # All models failed → fallback
         print(f"❌ AI Error after trying {tried_models}: {last_error}")
         return self._fallback(sem_start, notes=notes, reason=str(last_error), diagnostics=diagnostics)
 
     def _fallback(self, sem_start, notes="", reason=None, diagnostics=None):
-        """Graceful fallback that extracts practical tasks from plain text or dates."""
-        
-        # 🚀 STEP 1: Try your original conversation/action extraction
+        """Graceful fallback that still extracts practical tasks from plain transcript text."""
         extracted = self._extract_tasks_from_notes(notes, sem_start)
-        
-        # 🚀 STEP 2: If conversation extraction failed, try the new Date Regex!
-        if not extracted:
-            extracted = self._regex_date_fallback(notes, sem_start)
-
-        # 🚀 STEP 3: If absolutely everything failed, yield the dummy task
         if not extracted:
             ts = int(time.time())
             extracted = [{
-                "id": f"ts_{ts}_dummy",
-                "title": "Review syllabus and assign deadlines manually",
-                "description": "AI models were unavailable and no clear dates were found in the text.",
+                "id": f"ts_{ts}",
+                "title": "Review meeting transcript and assign assignees",
+                "description": "AI fallback mode could not parse clear action lines. Confirm assignees and deadlines manually.",
                 "deadline": sem_start,
                 "due_date_source": "suggested",
                 "priority": "high",
                 "status": "pending",
                 "owner": None,
-                "follow_up": "Check original PDF for schedule"
+                "follow_up": "Share one sentence per task: Assignee + Action + Date"
             }]
 
         payload = {
-            "project_name": "Mess2Master Fallback (Regex Mode)",
-            "tasks": extracted[:20], # Allow up to 20 regex tasks
-            "gaps": [{"issue": "AI was unavailable. Tasks were generated via Regex.", "suggestion": "Review descriptions to ensure they make sense."}],
+            "project_name": "Mess2Master Fallback",
+            "tasks": extracted[:10],
+            "gaps": [{"issue": "Some tasks may still miss clear assignees or due dates", "suggestion": "Review and update assignees and deadlines directly in the editable task cards."}],
+            "sync_score": 70,
             "cross_insights": []
         }
-        
         payload["_meta"] = diagnostics or {}
         payload["_meta"]["fallback"] = True
         payload["_meta"]["fallback_reason"] = reason or "All models failed"
-        
         return payload
 
     def _extract_tasks_from_notes(self, notes: str, sem_start: str) -> list:
@@ -609,52 +525,3 @@ class Mess2MasterAI:
             return int((sem_start or "")[:4])
         except Exception:
             return date.today().year
-    
-    def _regex_date_fallback(self, notes: str, sem_start: str) -> list:
-        """A rock-solid Regex fallback that hunts for dates in text when the AI fails."""
-        tasks = []
-        if not notes:
-            return tasks
-
-        # Split the text into individual lines or sentences
-        lines = re.split(r'[\n\r]+|\.\s+', notes)
-        
-        # Regex pattern looking for:
-        # 1. Week X (e.g., "Week 4")
-        # 2. DD/MM/YYYY or D/M/YY (e.g., "01/04/2026", "8/4/26")
-        # 3. Month DD (e.g., "April 1st", "Jan 15")
-        date_pattern = re.compile(
-            r'\b(?:Week\s+\d+|[0-3]?\d/[01]?\d/\d{2,4}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2})\b', 
-            re.IGNORECASE
-        )
-        
-        default_year = self._year_from_sem_start(sem_start)
-        
-        for i, line in enumerate(lines):
-            line = line.strip()
-            # Skip empty lines or lines that are too short to be a real task
-            if not line or len(line) < 10: 
-                continue
-                
-            date_match = date_pattern.search(line)
-            if date_match:
-                # We found a date! Try to formally parse it using your existing method
-                iso_date, due_source = self._extract_deadline(line, default_year)
-                
-                # If your extractor couldn't parse the exact ISO format, we'll flag it
-                if not iso_date:
-                    due_source = "regex_guess"
-                
-                tasks.append({
-                    "id": f"ts_{int(time.time())}_regex_{i}",
-                    "title": self._title_from_action(line),
-                    "description": line[:200], # Save the raw line so the user knows what it was
-                    "deadline": iso_date,
-                    "due_date_source": due_source,
-                    "priority": "high",
-                    "status": "pending",
-                    "owner": None,
-                    "follow_up": f"Auto-extracted via Regex based on: {date_match.group()}"
-                })
-                
-        return tasks
