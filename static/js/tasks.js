@@ -111,12 +111,47 @@ document.addEventListener('DOMContentLoaded', () => {
             e.stopPropagation();
             const target = marker.dataset.alertTarget;
             if (!target) return;
-            window.location.hash = target.replace('#', '');
-            const targetEl = document.querySelector(target);
-            if (targetEl) {
-                targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
+            focusTaskTarget(target);
         });
+    });
+
+    function focusTaskTarget(targetSelector) {
+        if (!targetSelector || !targetSelector.startsWith('#task-')) return false;
+        const targetEl = document.querySelector(targetSelector);
+        if (!targetEl) return false;
+
+        if (window.location.hash !== targetSelector) {
+            window.location.hash = targetSelector.replace('#', '');
+        }
+
+        targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        targetEl.classList.remove('alert-focus');
+        void targetEl.offsetWidth;
+        targetEl.classList.add('alert-focus');
+        setTimeout(() => targetEl.classList.remove('alert-focus'), 2600);
+        return true;
+    }
+
+    function focusAlertTaskFromHash() {
+        const hash = window.location.hash || '';
+        if (!hash.startsWith('#task-')) return;
+        focusTaskTarget(hash);
+    }
+
+    document.querySelectorAll('a[href^="#task-"]').forEach((link) => {
+        link.addEventListener('click', (e) => {
+            const target = link.getAttribute('href') || '';
+            if (!target.startsWith('#task-')) return;
+            e.preventDefault();
+            focusTaskTarget(target);
+        });
+    });
+
+    window.addEventListener('hashchange', () => {
+        const hash = window.location.hash || '';
+        if (hash.startsWith('#task-')) {
+            focusTaskTarget(hash);
+        }
     });
 
     function setNotionSuccessStatus(statusEl, syncedCount, dashboardUrl) {
@@ -144,6 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const taskEl = e.target.closest('.task-item');
             const taskId = taskEl?.dataset.id;
             const project = taskEl?.dataset.project;
+            const titleEl = taskEl?.querySelector('.task-title');
             
             if (!taskId || !project) return;
             
@@ -157,16 +193,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 if (data.status === 'completed') {
                     taskEl.classList.add('completed');
-                    const title = taskEl.querySelector('.task-title');
-                    if (title && !title.innerHTML.includes('<s>')) {
-                        title.innerHTML = `<s>${title.textContent}</s>`;
-                    }
+                    if (titleEl) titleEl.style.textDecoration = 'line-through';
                 } else if (data.status === 'pending') {
                     taskEl.classList.remove('completed');
-                    const title = taskEl.querySelector('.task-title');
-                    if (title) {
-                        title.innerHTML = title.textContent.replace('<s>', '').replace('</s>', '');
-                    }
+                    if (titleEl) titleEl.style.textDecoration = 'none';
                 }
             } catch (err) {
                 console.error('Toggle failed:', err);
@@ -359,6 +389,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // === Apply Filter from URL Hash on Load ===
     const hash = window.location.hash.replace('#', '');
     if (hash) {
-        setTimeout(() => filterTasks(hash), 100);
+        if (!hash.startsWith('task-')) {
+            setTimeout(() => filterTasks(hash), 100);
+        }
     }
+    setTimeout(focusAlertTaskFromHash, 120);
 });

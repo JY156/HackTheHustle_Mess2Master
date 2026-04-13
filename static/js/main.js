@@ -221,6 +221,51 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     });
 
+    function resolveSelectedProjectName() {
+        const unifiedProjectVal = projectNameInput?.value?.trim();
+        const newProjectVal = newProjectInput?.value?.trim();
+        const existingProjectVal = projectSelect?.value;
+        return unifiedProjectVal || newProjectVal || existingProjectVal || '';
+    }
+
+    function focusAlertTaskFromHash() {
+        const hash = window.location.hash || '';
+        if (!hash.startsWith('#task-')) return;
+        const target = document.querySelector(hash);
+        if (!target) return;
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        target.classList.add('alert-focus');
+        setTimeout(() => target.classList.remove('alert-focus'), 2600);
+    }
+
+    document.querySelectorAll('.complete-toggle').forEach((checkbox) => {
+        checkbox.addEventListener('change', async (e) => {
+            const taskEl = e.target.closest('.task-item');
+            const taskId = taskEl?.dataset.id;
+            const projectName = taskEl?.dataset.project;
+            const titleEl = taskEl?.querySelector('.task-title');
+            if (!taskEl || !taskId || !projectName) return;
+
+            try {
+                const res = await fetch('/api/tasks/complete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ task_id: taskId, project_name: projectName }),
+                });
+                const data = await res.json();
+                if (!res.ok || !['completed', 'pending'].includes(data.status)) {
+                    throw new Error(data.error || 'Unable to update task state');
+                }
+                const done = data.status === 'completed';
+                taskEl.classList.toggle('completed', done);
+                if (titleEl) titleEl.style.textDecoration = done ? 'line-through' : 'none';
+            } catch (err) {
+                console.error(err);
+                checkbox.checked = !checkbox.checked;
+            }
+        });
+    });
+
     // Restore status after reload
     const pendingStatus = window.sessionStorage.getItem('submitStatusMessage');
     const highlightSlug = window.sessionStorage.getItem('highlightProjectSlug');
@@ -235,6 +280,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         setTimeout(() => target.classList.remove('just-updated'), 1800);
         window.sessionStorage.removeItem('highlightProjectSlug');
     }
+    focusAlertTaskFromHash();
 
     function slugifyProjectName(name) {
         return (name || '').trim().replace(/\s+/g, '-');
@@ -530,6 +576,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 1. Privacy Modal Handlers
     if (startVoiceBtn && privacyModal) {
     startVoiceBtn.addEventListener('click', () => {
+        const selectedProject = resolveSelectedProjectName();
+        if (!selectedProject) {
+        voiceStatus.innerHTML = '⚠️ Please choose a project first before starting voice meeting.';
+        projectNameInput?.focus();
+        return;
+        }
         if (!hasAgreedPrivacy) {
         privacyModal.style.display = 'flex';
         } else {
@@ -623,12 +675,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 4. Send to Backend
     async function processVoiceTranscript(transcript) {
     try {
+        const projectName = resolveSelectedProjectName();
+        if (!projectName) {
+        voiceStatus.innerHTML = '⚠️ Please choose a project first before processing voice transcript.';
+        projectNameInput?.focus();
+        return;
+        }
+
         const formData = new FormData();
         formData.append('notes', `Voice meeting transcript:\n${transcript}`);
-        
-        const projSelect = document.getElementById('projectSelect');
-        const newProjInput = document.getElementById('newProjectInput');
-        const projectName = (newProjInput?.value?.trim()) || (projSelect?.value) || 'Voice Meeting';
+
         formData.append('project_name', projectName);
         formData.append('sem_start', document.querySelector('input[name="sem_start"]')?.value || '2026-01-12');
         formData.append('sem_end', document.querySelector('input[name="sem_end"]')?.value || '2026-05-15');

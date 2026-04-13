@@ -194,11 +194,14 @@
                         <div class="task-list">
                             {% if recent.pending_tasks %}
                                 {% for t in recent.pending_tasks[:5] %}
-                                <div class="task-item {{ t.priority }}" id="task-{{ t.id }}">
+                                <div class="task-item {{ t.priority }}" id="task-{{ t.id }}" data-id="{{ t.id }}" data-project="{{ recent.project_name }}">
                                     <div class="task-view">
                                         <div class="task-content">
                                             <div class="task-info">
-                                                <strong>{{ t.title or t.task }}</strong>
+                                                <label style="display:inline-flex; align-items:center; gap:0.45rem; margin:0; color:var(--text);">
+                                                    <input type="checkbox" class="complete-toggle" {% if (t.status or 'pending') == 'completed' %}checked{% endif %}>
+                                                    <strong class="task-title">{{ t.title or t.task }}</strong>
+                                                </label>
                                                 {% if t.id in (recent.alert_task_ids or []) %}
                                                 <span title="Alert task" style="color:#f59e0b; margin-left:0.35rem;"><i class="fas fa-triangle-exclamation"></i></span>
                                                 {% endif %}

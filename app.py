@@ -202,18 +202,36 @@ def build_project_alerts(project):
         if deadline_dt:
             delta_hours = (deadline_dt - now).total_seconds() / 3600.0
             if delta_hours < 0:
-                alerts.append({"type": "overdue", "title": title, "task_id": task_id})
+                alerts.append({
+                    "type": "overdue",
+                    "title": title,
+                    "task_id": task_id,
+                    "urgency_rank": 3,
+                    "metric": delta_hours,
+                })
                 continue
             if delta_hours <= WEB_ALERT_DUE_SOON_HOURS:
-                alerts.append({"type": "due_soon", "title": title, "task_id": task_id})
+                alerts.append({
+                    "type": "due_soon",
+                    "title": title,
+                    "task_id": task_id,
+                    "urgency_rank": 2,
+                    "metric": delta_hours,
+                })
                 continue
 
         created_at = parse_created_at_from_id(task)
         if created_at:
             age_hours = (now - created_at).total_seconds() / 3600.0
             if age_hours >= WEB_ALERT_STALLED_HOURS:
-                alerts.append({"type": "stalled", "title": title, "task_id": task_id})
-
+                alerts.append({
+                    "type": "stalled",
+                    "title": title,
+                    "task_id": task_id,
+                    "urgency_rank": 1,
+                    "metric": -age_hours,
+                })
+    alerts.sort(key=lambda a: (-int(a.get("urgency_rank", 0)), float(a.get("metric", 0.0))))
     return alerts
 
 
@@ -227,6 +245,32 @@ def first_alert_target(project, external=False):
     if not alerts:
         return None
     anchor = alert_anchor(alerts[0].get("task_id"))
+    if not anchor:
+        return None
+    return f"/tasks#{anchor}" if external else f"#{anchor}"
+
+
+def first_global_alert_target(projects, external=False):
+    best_item = None
+    for project in projects:
+        for alert in project.get("alerts") or []:
+            task_id = str(alert.get("task_id") or "").strip()
+            if not task_id:
+                continue
+            candidate = {
+                "rank": int(alert.get("urgency_rank", 0)),
+                "metric": float(alert.get("metric", 0.0)),
+                "task_id": task_id,
+            }
+            if not best_item:
+                best_item = candidate
+                continue
+            if (candidate["rank"], -candidate["metric"]) > (best_item["rank"], -best_item["metric"]):
+                best_item = candidate
+
+    if not best_item:
+        return None
+    anchor = alert_anchor(best_item["task_id"])
     if not anchor:
         return None
     return f"/tasks#{anchor}" if external else f"#{anchor}"
@@ -254,8 +298,7 @@ def index():
         project["alert_task_ids"] = project_alert_task_ids(project)
         project["first_alert_target"] = first_alert_target(project, external=True)
     alert_count = sum(p.get("alert_count", 0) for p in projects)
-    first_alert_project = next((p for p in projects if p.get("alert_count", 0) > 0), None)
-    alert_target = first_alert_project.get("first_alert_target") if first_alert_project else None
+    alert_target = first_global_alert_target(projects, external=True)
     project_names = [p.get("project_name") for p in projects]
     semester = data.get("semester", {})
     
@@ -290,8 +333,7 @@ def tasks_page():
         project["alert_task_ids"] = project_alert_task_ids(project)
         project["first_alert_target"] = first_alert_target(project, external=False)
     alert_count = sum(p.get("alert_count", 0) for p in projects)
-    first_alert_project = next((p for p in projects if p.get("alert_count", 0) > 0), None)
-    alert_target = first_alert_project.get("first_alert_target") if first_alert_project else None
+    alert_target = first_global_alert_target(projects, external=False)
     
     # Build master queue (null-safe sort)
     all_pending = []
