@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, render_template, redirect
 from dotenv import load_dotenv
 import os, json, time, threading
+import re
 from datetime import datetime
 from gemini_client import Mess2MasterAI
 from notion_client import NotionClient  # Optional: wrapped in try/except
@@ -68,22 +69,43 @@ def safe_deadline(task):
 def priority_score(priority):
     return {"high": 3, "medium": 2, "low": 1}.get(priority, 1)
 
+
+def task_signature(task):
+    """Build a stable semantic key for deduping equivalent tasks across reprocessing."""
+    title = str(task.get("title") or task.get("task") or "").strip().lower()
+    title = re.sub(r"\s+", " ", title)
+    title = re.sub(r"[^a-z0-9 ]", "", title)
+    deadline = str(task.get("deadline") or task.get("due_date") or "").strip()
+    return (title, deadline)
+
 # === Helper: Merge Tasks by ID ===
 def merge_tasks(existing, new_tasks):
     """Merge new tasks into existing, preserving IDs and avoiding duplicates"""
     existing_map = {t.get("id"): t for t in existing if t.get("id")}
+    signature_map = {task_signature(t): t for t in existing if (t.get("title") or t.get("task"))}
     
     for new in new_tasks:
         key = new.get("id")
         if key and key in existing_map:
             # Update existing task fields (except id)
             existing_map[key].update({k: v for k, v in new.items() if k != "id"})
+            signature_map[task_signature(existing_map[key])] = existing_map[key]
         else:
+            # Merge by semantic equivalence to prevent duplicate cards on repeat voice processing.
+            sig = task_signature(new)
+            match = signature_map.get(sig)
+            if match:
+                match.update({k: v for k, v in new.items() if k != "id"})
+                match["status"] = "pending"
+                continue
+
             # Add new task with guaranteed ID
             if not new.get("id"):
                 new["id"] = f"ts_{int(time.time())}_{hash(new.get('title',''))%10000}"
             new["status"] = "pending"
             existing.append(new)
+            existing_map[new["id"]] = new
+            signature_map[task_signature(new)] = new
     return existing
 
 def find_task(data, project_name, task_id):
@@ -158,7 +180,18 @@ def build_display_gaps(project):
             "suggestion": "Set a clear due date so priorities and reminders stay reliable.",
         })
 
-    return base_gaps
+    deduped = []
+    seen = set()
+    for gap in base_gaps:
+        issue = str((gap or {}).get("issue") or "").strip()
+        suggestion = str((gap or {}).get("suggestion") or "").strip()
+        key = (issue.lower(), suggestion.lower())
+        if not issue or key in seen:
+            continue
+        seen.add(key)
+        deduped.append({"issue": issue, "suggestion": suggestion})
+
+    return deduped
 
 
 def parse_deadline_for_alert(task):

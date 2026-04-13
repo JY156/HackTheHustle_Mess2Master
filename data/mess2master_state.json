@@ -6,82 +6,6 @@
   },
   "projects": [
     {
-      "project_name": "WIA2004 OS",
-      "pending_tasks": [
-        {
-          "id": "ts_1775900415",
-          "title": "Setup Project Repository",
-          "description": "Initialize git and README",
-          "deadline": "2026-03-09",
-          "due_date_source": "explicit",
-          "priority": "high",
-          "status": "pending",
-          "owner": "Team Lead",
-          "follow_up": "Confirm repository name and assign first owner"
-        },
-        {
-          "id": "ts_1775900529",
-          "title": "Setup Project Repository",
-          "description": "Initialize git and README",
-          "deadline": "2026-03-09",
-          "due_date_source": "explicit",
-          "priority": "high",
-          "status": "pending",
-          "owner": "Team Lead",
-          "follow_up": "Confirm repository name and assign first owner"
-        }
-      ],
-      "completed_tasks": [],
-      "gaps": [
-        {
-          "issue": "Missing methodology section",
-          "suggestion": "Schedule 1hr meeting to align on approach"
-        }
-      ],
-      "sync_score": 75,
-      "cross_insights": [
-        "Reuse literature review template from previous course"
-      ]
-    },
-    {
-      "project_name": "WIF2003 WP",
-      "pending_tasks": [
-        {
-          "id": "ts_1775901756",
-          "title": "Setup Project Repository",
-          "description": "Initialize git and README",
-          "deadline": "2026-03-09",
-          "due_date_source": "explicit",
-          "priority": "high",
-          "status": "pending",
-          "owner": "Team Lead",
-          "follow_up": "Confirm repository name and assign first owner"
-        },
-        {
-          "id": "ts_1775904170",
-          "title": "Setup Project Repository",
-          "description": "Initialize git and README",
-          "deadline": "2026-03-09",
-          "due_date_source": "explicit",
-          "priority": "high",
-          "status": "pending",
-          "owner": "Team Lead",
-          "follow_up": "Confirm repository name and assign first owner"
-        }
-      ],
-      "completed_tasks": [],
-      "gaps": [
-        {
-          "issue": "Missing methodology section",
-          "suggestion": "Schedule 1hr meeting to align on approach"
-        }
-      ],
-      "sync_score": 75,
-      "cross_insights": [
-        "Reuse literature review template from previous course"
-      ]
-    },
-    {
       "project_name": "WIA2003",
       "pending_tasks": [
         {
@@ -221,8 +145,227 @@
       "cross_insights": []
     },
     {
+      "project_name": "WIA2004 OS",
+      "pending_tasks": [
+        {
+          "id": "ts_1775900415",
+          "title": "Setup Project Repository",
+          "description": "Initialize git and README",
+          "deadline": "2026-03-09",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Team Lead",
+          "follow_up": "Confirm repository name and assign first owner"
+        },
+        {
+          "id": "ts_1775900529",
+          "title": "Setup Project Repository",
+          "description": "Initialize git and README",
+          "deadline": "2026-03-09",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Team Lead",
+          "follow_up": "Confirm repository name and assign first owner"
+        },
+        {
+          "id": "ts_1776092400_0",
+          "title": "Write the final report",
+          "description": "write the final report",
+          "deadline": "2026-04-17",
+          "due_date_source": "suggested",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Jason",
+          "follow_up": null
+        }
+      ],
+      "completed_tasks": [],
+      "gaps": [
+        {
+          "issue": "Some tasks may still miss clear assignees or due dates",
+          "suggestion": "Review and update assignees and deadlines directly in the editable task cards."
+        }
+      ],
+      "sync_score": 70,
+      "cross_insights": []
+    },
+    {
+      "project_name": "WIF2003 WP",
+      "pending_tasks": [
+        {
+          "id": "ts_1775901756",
+          "title": "Setup Project Repository",
+          "description": "Initialize git and README",
+          "deadline": "2026-03-09",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Team Lead",
+          "follow_up": "Confirm repository name and assign first owner"
+        },
+        {
+          "id": "ts_1775904170",
+          "title": "Setup Project Repository",
+          "description": "Initialize git and README",
+          "deadline": "2026-03-09",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Team Lead",
+          "follow_up": "Confirm repository name and assign first owner"
+        },
+        {
+          "id": "ts_1776092312_0",
+          "title": "Help to complete the lab report",
+          "description": "help to complete the lab report",
+          "deadline": "2026-04-17",
+          "due_date_source": "suggested",
+          "priority": "high",
+          "status": "pending",
+          "owner": "you",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776092312_1",
+          "title": "Set up a github Repo",
+          "description": "set up a github Repo",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Aaron",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776092802_0",
+          "title": "You build the log in API",
+          "description": "you build the log in API",
+          "deadline": "2026-04-14",
+          "due_date_source": "suggested",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Sarah",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776092802_1",
+          "title": "Write the final report",
+          "description": "write the final report",
+          "deadline": "2026-04-17",
+          "due_date_source": "suggested",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Jason",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776092802_2",
+          "title": "Demo slides",
+          "description": "demo slides",
+          "deadline": "2026-04-20",
+          "due_date_source": "suggested",
+          "priority": "high",
+          "status": "pending",
+          "owner": null,
+          "follow_up": "Assign owner"
+        }
+      ],
+      "completed_tasks": [],
+      "gaps": [
+        {
+          "issue": "Some tasks may still miss clear assignees or due dates",
+          "suggestion": "Review and update assignees and deadlines directly in the editable task cards."
+        }
+      ],
+      "sync_score": 70,
+      "cross_insights": []
+    },
+    {
       "project_name": "WIF2002 SRE",
-      "pending_tasks": [],
+      "pending_tasks": [
+        {
+          "id": "ts_1776092501_0",
+          "title": "Write the final report",
+          "description": "write the final report",
+          "deadline": "2026-04-17",
+          "due_date_source": "suggested",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Jason",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776092501_1",
+          "title": "The demo slides",
+          "description": "the demo slides",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "also",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776093279_0",
+          "title": "You finish the final report",
+          "description": "you finish the final report",
+          "deadline": "2026-04-14",
+          "due_date_source": "suggested",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Sarah",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776093279_1",
+          "title": "Prepare the presentation slides",
+          "description": "prepare the presentation slides",
+          "deadline": "2026-04-20",
+          "due_date_source": "suggested",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Jason",
+          "follow_up": null
+        }
+      ],
+      "completed_tasks": [],
+      "gaps": [
+        {
+          "issue": "Some tasks may still miss clear assignees or due dates",
+          "suggestion": "Review and update assignees and deadlines directly in the editable task cards."
+        }
+      ],
+      "sync_score": 70,
+      "cross_insights": []
+    },
+    {
+      "project_name": "Introduction to Python",
+      "pending_tasks": [
+        {
+          "id": "ts_1776093817_0",
+          "title": "Build the login API",
+          "description": "build the login API",
+          "deadline": "2026-04-14",
+          "due_date_source": "suggested",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Sarah",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776093817_1",
+          "title": "Write the final report",
+          "description": "write the final report",
+          "deadline": "2026-04-17",
+          "due_date_source": "suggested",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Jason",
+          "follow_up": null
+        }
+      ],
       "completed_tasks": [],
       "gaps": [
         {

@@ -25,6 +25,25 @@ class Mess2MasterAI:
             "models/gemini-2.5-flash",
         ]
 
+    def _normalize_owner(self, owner):
+        raw = str(owner or "").strip()
+        if not raw:
+            return None
+
+        lower = raw.lower().strip(" .,!?:;\"'")
+        invalid = {
+            "someone", "somebody", "anyone", "anybody", "everyone", "team",
+            "could", "can", "will", "should", "must", "also", "then", "next",
+            "i", "im", "i'm", "me", "we", "us", "you", "unassigned", "none", "null"
+        }
+        if lower in invalid:
+            return None
+
+        if re.fullmatch(r"[a-zA-Z][a-zA-Z\-']{1,30}", raw):
+            return raw.capitalize()
+
+        return raw
+
     def generate_task_guidance(self, task: dict):
         """Generate concise, actionable execution guidance for a single task."""
         title = (task.get("title") or task.get("task") or "Untitled Task").strip()
@@ -281,6 +300,7 @@ class Mess2MasterAI:
                             task["id"] = f"ts_{int(time.time())}_{hash(task.get('title', '')) % 10000}"
                         task["status"] = "pending"  # Enforce status
                         task["deadline"] = task.get("deadline") or task.get("due_date")  # Field name compatibility
+                        task["owner"] = self._normalize_owner(task.get("owner"))
                         if not task.get("due_date_source"):
                             task["due_date_source"] = "suggested" if task.get("deadline") else "null"
 
@@ -325,10 +345,12 @@ class Mess2MasterAI:
                 "follow_up": "Share one sentence per task: Assignee + Action + Date"
             }]
 
+        dynamic_gaps = self._build_dynamic_gaps(extracted)
+
         payload = {
             "project_name": "Mess2Master Fallback",
             "tasks": extracted[:10],
-            "gaps": [{"issue": "Some tasks may still miss clear assignees or due dates", "suggestion": "Review and update assignees and deadlines directly in the editable task cards."}],
+            "gaps": dynamic_gaps,
             "sync_score": 70,
             "cross_insights": []
         }
@@ -337,6 +359,37 @@ class Mess2MasterAI:
         payload["_meta"]["fallback_reason"] = reason or "All models failed"
         return payload
 
+    def _build_dynamic_gaps(self, tasks: list) -> list:
+        """Generate risk gaps from actual task quality instead of static fallback text."""
+        pending = [t for t in (tasks or []) if str(t.get("status") or "pending").lower() != "completed"]
+        gaps = []
+
+        unassigned = 0
+        no_deadline = 0
+        for task in pending:
+            owner = str(task.get("owner") or "").strip().lower()
+            deadline = str(task.get("deadline") or task.get("due_date") or "").strip()
+            if not owner or owner == "unassigned":
+                unassigned += 1
+            if not deadline:
+                no_deadline += 1
+
+        if unassigned:
+            label = "task" if unassigned == 1 else "tasks"
+            gaps.append({
+                "issue": f"{unassigned} pending {label} without assignee",
+                "suggestion": "Assign each task to a specific teammate to avoid ownership gaps."
+            })
+
+        if no_deadline:
+            label = "task" if no_deadline == 1 else "tasks"
+            gaps.append({
+                "issue": f"{no_deadline} pending {label} without deadline",
+                "suggestion": "Set a clear due date so priorities and reminders stay reliable."
+            })
+
+        return gaps
+
     def _extract_tasks_from_notes(self, notes: str, sem_start: str) -> list:
         text = (notes or "").strip()
         if not text:
@@ -344,9 +397,10 @@ class Mess2MasterAI:
 
         default_year = self._year_from_sem_start(sem_start)
         normalized = re.sub(r"\s+", " ", text)
-        normalized = re.sub(r"(?i)\b(next|also|wait|first|then|finally|meanwhile|additionally|and also|oh and)\b", r". \1", normalized)
+        # Do not split on words like "next" or "also" because they often belong to deadlines/actions.
+        normalized = re.sub(r"(?i)\b(wait|first|then|finally|meanwhile|additionally|and also|oh and)\b", r". \1", normalized)
         normalized = re.sub(
-            r"\s+(?=[A-Z][a-z]+(?:,)?\s+(?:can you|please|you'll|you have|you've|you can|we need|we have|take|draft|design|write|prepare|check|confirm|handle|since))",
+            r"\s+(?=[A-Z][a-z]+(?:,)?\s+(?:will|can|could|should|must|needs?\s+to|has\s+to|can you|please|you'll|you have|you've|you can|we need|we have|take|draft|design|write|prepare|check|confirm|handle|since))",
             ". ",
             normalized,
         )
@@ -356,13 +410,17 @@ class Mess2MasterAI:
         last_task = None
 
         for clause in clauses:
+            clause = re.sub(r"^(?:and|also|then|next|finally|meanwhile|additionally|oh and)\b[:\s,.-]*", "", clause, flags=re.IGNORECASE).strip()
+            if not clause:
+                continue
+
             owner = None
             action = None
             deadline_iso = None
             due_source = "null"
 
             m_owner = re.search(
-                r"\b(?P<owner>[A-Z][a-z]+)(?:,)?\s*(?:since[^,]*,?\s*)?(?:can you|please|you(?:'ll| will)|you've[^,]*,?\s*so please|you have|you can|take|draft|design|write|prepare|check|confirm|handle)\s+(?P<action>.+)",
+                r"\b(?P<owner>[A-Za-z][a-z]+)(?:,)?\s*(?:since[^,]*,?\s*)?(?:can you|please|you(?:'ll| will)|you've[^,]*,?\s*so please|you have|you can|take|draft|design|write|prepare|check|confirm|handle)\s+(?P<action>.+)",
                 clause,
                 flags=re.IGNORECASE,
             )
@@ -370,11 +428,24 @@ class Mess2MasterAI:
                 owner = m_owner.group("owner")
                 action = m_owner.group("action")
 
-                # "Sarah, can you handle that" should assign previous open task owner.
-                if action and re.fullmatch(r"(?:handle|take|do)?(?:\s+(?:that|this|it|the same))?[?.!]*", action.strip(), flags=re.IGNORECASE):
-                    if last_task and not last_task.get("owner"):
-                        last_task["owner"] = owner
-                    continue
+            if not action:
+                # Handles natural speech like "Sarah will build...", "Jason could write..."
+                m_owner_simple = re.search(
+                    r"\b(?P<owner>[A-Za-z][a-z]+)\s+(?:will|can|could|should|must|needs?\s+to|has\s+to)\s+(?P<action>.+)",
+                    clause,
+                    flags=re.IGNORECASE,
+                )
+                if m_owner_simple:
+                    owner = m_owner_simple.group("owner")
+                    action = m_owner_simple.group("action")
+
+            # "Sarah, can you handle that" should assign previous open task owner.
+            if action and re.fullmatch(r"(?:handle|take|do)?(?:\s+(?:that|this|it|the same))?[?.!]*", action.strip(), flags=re.IGNORECASE):
+                if last_task and owner and not last_task.get("owner"):
+                    last_task["owner"] = owner
+                continue
+
+            owner = self._normalize_owner(owner)
 
             if not action:
                 m_need = re.search(r"\b(?:we need to|we have to|please)\s+(?P<action>.+)", clause, flags=re.IGNORECASE)
@@ -444,24 +515,34 @@ class Mess2MasterAI:
 
     def _merge_task_lists(self, primary_tasks: list, secondary_tasks: list) -> list:
         merged = []
-        seen = set()
+        merged_by_key = {}
 
         for source in (primary_tasks or [], secondary_tasks or []):
             for task in source:
                 title = self._title_from_action(str(task.get("title") or task.get("description") or ""))
                 deadline = task.get("deadline") or task.get("due_date") or ""
-                owner = (task.get("owner") or "").strip().lower()
-                key = (title.lower(), deadline, owner)
-                if key in seen:
-                    continue
-                seen.add(key)
+                key = (title.lower(), deadline)
 
                 normalized = dict(task)
                 normalized["title"] = title
                 normalized["deadline"] = normalized.get("deadline") or normalized.get("due_date")
                 normalized["status"] = "pending"
+                normalized["owner"] = self._normalize_owner(normalized.get("owner"))
                 if not normalized.get("due_date_source"):
                     normalized["due_date_source"] = "suggested" if normalized.get("deadline") else "null"
+
+                if key in merged_by_key:
+                    existing = merged_by_key[key]
+                    # Prefer richer owner/follow-up info from whichever source has it.
+                    if not existing.get("owner") and normalized.get("owner"):
+                        existing["owner"] = normalized.get("owner")
+                    if not existing.get("follow_up") and normalized.get("follow_up"):
+                        existing["follow_up"] = normalized.get("follow_up")
+                    if not existing.get("description") and normalized.get("description"):
+                        existing["description"] = normalized.get("description")
+                    continue
+
+                merged_by_key[key] = normalized
                 merged.append(normalized)
 
         return merged
@@ -496,16 +577,23 @@ class Mess2MasterAI:
             }[month_name]
             return date(default_year, month, 15).isoformat(), "suggested"
 
-        weekday_pattern = re.search(r"\b(?:this\s+)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b", text, flags=re.IGNORECASE)
+        if re.search(r"\b(tomorrow|tmr)\b", text, flags=re.IGNORECASE) and re.search(r"\b(by|before|due)\b", text, flags=re.IGNORECASE):
+            return (date.today() + timedelta(days=1)).isoformat(), "suggested"
+
+        weekday_pattern = re.search(r"\b(?:(this|next)\s+)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b", text, flags=re.IGNORECASE)
         if weekday_pattern and re.search(r"\b(by|before|due)\b", text, flags=re.IGNORECASE):
-            target_name = weekday_pattern.group(1).lower()
+            qualifier = (weekday_pattern.group(1) or "").lower()
+            target_name = weekday_pattern.group(2).lower()
             target_weekday = {
                 "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
                 "friday": 4, "saturday": 5, "sunday": 6,
             }[target_name]
             today = date.today()
             delta = (target_weekday - today.weekday()) % 7
-            delta = 7 if delta == 0 else delta
+            if qualifier == "next":
+                delta = delta + 7 if delta != 0 else 7
+            else:
+                delta = 7 if delta == 0 else delta
             return (today + timedelta(days=delta)).isoformat(), "suggested"
 
         return None, "null"
