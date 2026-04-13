@@ -236,6 +236,13 @@ input:focus, textarea:focus, select:focus {
     color: var(--primary);
 }
 
+.voice-stop-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    line-height: 1;
+}
+
 .live-listen-btn {
     width: auto;
     display: inline-flex;
