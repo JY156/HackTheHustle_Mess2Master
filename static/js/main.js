@@ -571,6 +571,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     let recognition = null;
     let isRecording = false;
     let fullTranscript = '';
+    let interimTranscript = '';
+    const MIN_VOICE_TRANSCRIPT_LEN = 12;
     let hasAgreedPrivacy = sessionStorage.getItem('voicePrivacyAgreed') === 'true';
 
     // 1. Privacy Modal Handlers
@@ -610,18 +612,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = 'en-US';
+    recognition.maxAlternatives = 1;
 
     recognition.onresult = (event) => {
-        let interim = '';
+        const interimChunks = [];
         for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
+        const transcript = (event.results[i][0].transcript || '').trim();
+        if (!transcript) continue;
+
+        const cleanForLength = transcript.replace(/[.?!,\s]+/g, '');
+        if (!cleanForLength) continue;
+
         if (event.results[i].isFinal) {
-            const sentence = transcript.trim().replace(/[.?!]+$/, '');
-            fullTranscript += `${sentence}. `;
+            fullTranscript += `${transcript} `;
         }
-        else interim = transcript;
+        else interimChunks.push(transcript);
         }
-        liveTranscript.innerHTML = `<strong>Transcript:</strong> ${fullTranscript}<br><em style="color: var(--text-muted);">Listening: ${interim}</em>`;
+        interimTranscript = interimChunks.join(' ').trim();
+        liveTranscript.innerHTML = `<strong>Transcript:</strong> ${fullTranscript.trim()}<br><em style="color: var(--text-muted);">Listening: ${interimTranscript}</em>`;
         liveTranscript.scrollTop = liveTranscript.scrollHeight;
     };
 
@@ -641,6 +649,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function startRecording() {
     if (!recognition) return;
     fullTranscript = '';
+    interimTranscript = '';
     isRecording = true;
     recognition.start();
     startVoiceBtn.style.display = 'none';
@@ -662,11 +671,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         recognition.stop();
         stopRecordingUI();
         voiceStatus.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Extracting tasks from conversation...';
+
+        // Use both finalized and latest interim speech to avoid losing words on manual stop.
+        const transcriptToProcess = `${fullTranscript} ${interimTranscript}`.trim();
         
-        if (fullTranscript.trim().length > 30) {
-        await processVoiceTranscript(fullTranscript);
+        if (transcriptToProcess.length >= MIN_VOICE_TRANSCRIPT_LEN) {
+        await processVoiceTranscript(transcriptToProcess);
         } else {
-        voiceStatus.innerHTML = '⚠️ Too short. Try speaking more.';
+        voiceStatus.innerHTML = '⚠️ No usable speech detected. Check browser mic permission, correct input device, and speak for 3-5 seconds before stopping.';
         liveTranscript.style.display = 'none';
         }
     });

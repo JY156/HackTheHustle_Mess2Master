@@ -222,30 +222,7 @@
     },
     {
       "project_name": "WIF2002 SRE",
-      "pending_tasks": [
-        {
-          "id": "ts_1775903508",
-          "title": "Setup Project Repository",
-          "description": "Initialize git and README",
-          "deadline": "2026-03-09",
-          "due_date_source": "explicit",
-          "priority": "high",
-          "status": "pending",
-          "owner": "Team Lead",
-          "follow_up": "Confirm repository name and assign first owner"
-        },
-        {
-          "id": "ts_1776090729_0",
-          "title": "A lab report",
-          "description": "a lab report",
-          "deadline": "2026-04-17",
-          "due_date_source": "suggested",
-          "priority": "high",
-          "status": "pending",
-          "owner": "can",
-          "follow_up": null
-        }
-      ],
+      "pending_tasks": [],
       "completed_tasks": [],
       "gaps": [
         {
