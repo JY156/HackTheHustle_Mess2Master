@@ -39,7 +39,7 @@ This **"coordination tax"** leads to:
 
 ### Key Capabilities
 
-* ✅ **Prioritized task lists** with deadlines & owner suggestions
+* ✅ **Prioritized task lists** with deadlines & assignee suggestions
 * ✅ **Smart gap analysis** (missing sections, unassigned roles)
 * ✅ **Calendar integration** (Google Calendar links)
 * ✅ **Voice-first meetings** with live transcription

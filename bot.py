@@ -1,6 +1,8 @@
 import os
 import re
 import json
+import time
+from collections import deque
 from html import escape as html_escape
 from io import BytesIO
 from datetime import date
@@ -10,6 +12,7 @@ from urllib.parse import quote
 from dotenv import load_dotenv
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReactionTypeEmoji, Update
 from telegram.constants import ParseMode
+from telegram.error import BadRequest
 from telegram.ext import (
     ApplicationBuilder,
     CallbackQueryHandler,
@@ -23,6 +26,7 @@ from notion_client import NotionClient
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 load_dotenv(os.path.join(os.path.dirname(BASE_DIR), ".env"))
+STATE_FILE = os.path.join(BASE_DIR, "data", "mess2master_state.json")
 
 ai = Mess2MasterAI()
 TRIGGERS = [
@@ -35,9 +39,17 @@ TRIGGERS = [
     "submit",
 ]
 CHAT_STATE = {}
+CHAT_CONTEXT = {}
 CONFIDENCE_THRESHOLD = 0.65
 STRONG_SIGNAL_WORDS = ["due", "by", "friday", "monday", "assign", "need to", "finish", "submit"]
 TASK_SPLIT_RE = re.compile(r"\s+(?:and also|also|and then|plus|,\s+and|;|\.|\n)\s+", re.I)
+AMBIGUOUS_TITLES = {"this", "that", "it", "do this", "do that", "follow up", "the task"}
+ASSIGNEE_SUGGESTION_THRESHOLD = 3
+SKILL_HINTS = {
+    "writing": ["report", "draft", "write", "slides", "documentation"],
+    "design": ["ui", "design", "wireframe", "frontend", "prototype"],
+    "backend": ["api", "backend", "database", "schema", "auth"],
+}
 
 
 def normalize_alias_key(value: str) -> str:
@@ -94,6 +106,82 @@ def resolve_assignee(name: str) -> str:
     if " " not in clean:
         return f"@{clean}"
     return clean
+
+
+def get_context_buffer(chat_id: int):
+    if chat_id not in CHAT_CONTEXT:
+        CHAT_CONTEXT[chat_id] = deque(maxlen=10)
+    return CHAT_CONTEXT[chat_id]
+
+
+def add_context_message(chat_id: int, sender: str, text: str):
+    buffer = get_context_buffer(chat_id)
+    compact = shorten_text(text, 220)
+    if compact:
+        buffer.append({"sender": sender or "unknown", "text": compact})
+
+
+def infer_topic_from_context(context_buffer: list[dict], current_text: str) -> str | None:
+    current = (current_text or "").lower()
+    for entry in reversed(context_buffer or []):
+        candidate = simplify_task_title(entry.get("text") or "")
+        if not candidate:
+            continue
+        if candidate.strip().lower() in AMBIGUOUS_TITLES:
+            continue
+        if candidate.lower() in current:
+            continue
+        return candidate
+    return None
+
+
+def suggest_assignee_from_context(task: dict, context_buffer: list[dict]) -> tuple[str | None, int]:
+    title = (task.get("title") or "").lower()
+    if not title:
+        return None, 0
+
+    # Prefer explicit handle/name mentions from recent context with matching task domain.
+    scores: dict[str, int] = {}
+    for entry in context_buffer or []:
+        sender = entry.get("sender") or ""
+        text = (entry.get("text") or "").lower()
+        if not text:
+            continue
+
+        domain_bonus = 0
+        for _, keywords in SKILL_HINTS.items():
+            if any(k in title for k in keywords) and any(k in text for k in keywords):
+                domain_bonus += 2
+
+        ownership_phrase = any(p in text for p in ["i can", "i'll", "i will", "i like", "i'm good at", "i am good at"])
+        mention_match = re.findall(r"@([a-z0-9_]{3,})", text, flags=re.I)
+        for handle in mention_match:
+            key = resolve_assignee(f"@{handle}")
+            scores[key] = scores.get(key, 0) + 1 + domain_bonus
+
+        if sender and sender != "unknown":
+            key = resolve_assignee(sender)
+            scores[key] = scores.get(key, 0) + (2 if ownership_phrase else 0) + domain_bonus
+
+    if not scores:
+        return None, 0
+    best = max(scores.items(), key=lambda kv: kv[1])
+    return best[0], int(best[1])
+
+
+def attach_assignee_suggestions(tasks: list[dict], context_buffer: list[dict]):
+    for task in tasks:
+        owner = (task.get("owner") or "").strip().lower()
+        if owner and owner != "unassigned":
+            continue
+        suggestion, confidence = suggest_assignee_from_context(task, context_buffer)
+        task["needs_assignee"] = True
+        if suggestion and confidence >= ASSIGNEE_SUGGESTION_THRESHOLD:
+            task["assignee_suggestion"] = suggestion
+            task["assignee_suggestion_confidence"] = confidence
+        else:
+            task["assignee_suggestion"] = None
+            task["assignee_suggestion_confidence"] = confidence
 
 
 class InMemoryUpload:
@@ -246,12 +334,16 @@ def split_task_clauses(message_text: str) -> list[str]:
     return task_like or pieces
 
 
-def extract_tasks_from_message(message_text: str, default_owner: str) -> list[dict]:
+def extract_tasks_from_message(message_text: str, default_owner: str, context_buffer: list[dict] | None = None) -> list[dict]:
     tasks = []
+    inferred_topic = infer_topic_from_context(context_buffer or [], message_text)
     for clause in split_task_clauses(message_text):
         title = simplify_task_title(clause)
         if not title:
             continue
+
+        if title.strip().lower() in AMBIGUOUS_TITLES and inferred_topic:
+            title = inferred_topic
 
         due_date = infer_due_date(clause)
         due_time = infer_due_time(clause)
@@ -442,8 +534,96 @@ def notion_url() -> str | None:
     return f"https://www.notion.so/{db_id}" if db_id else None
 
 
+def load_website_state() -> dict:
+    if not os.path.exists(STATE_FILE):
+        return {"semester": {}, "projects": []}
+    try:
+        with open(STATE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if isinstance(data, list):
+                return {"semester": {}, "projects": data}
+            return data
+    except Exception:
+        return {"semester": {}, "projects": []}
+
+
+def save_website_state(data: dict):
+    os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
+    with open(STATE_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+
+def website_task_id(seed: str) -> str:
+    return f"ts_{int(time.time())}_{abs(hash(seed)) % 10000}"
+
+
+def task_identity(task: dict) -> str:
+    title = (task.get("title") or "").strip().lower()
+    deadline = (task.get("deadline") or task.get("due_date") or "").strip().lower()
+    return f"{title}|{deadline}"
+
+
+def map_task_for_website(task: dict) -> dict:
+    deadline = task.get("deadline") or task.get("due_date") or None
+    title = (task.get("title") or "Untitled").strip()
+    return {
+        "id": task.get("id") or website_task_id(f"{title}|{deadline}"),
+        "title": title,
+        "description": (task.get("description") or "").strip(),
+        "deadline": deadline,
+        "priority": (task.get("priority") or "medium").lower(),
+        "status": "pending",
+        "owner": task.get("owner"),
+        "follow_up": task.get("follow_up"),
+    }
+
+
+def sync_tasks_to_website(tasks: list[dict], project_name: str) -> dict:
+    if not tasks:
+        return {"status": "error", "message": "No tasks to sync", "synced_count": 0}
+
+    clean_project = (project_name or "Telegram Inbox").strip()
+    state = load_website_state()
+    projects = state.setdefault("projects", [])
+    project = next((p for p in projects if p.get("project_name") == clean_project), None)
+    if not project:
+        project = {
+            "project_name": clean_project,
+            "pending_tasks": [],
+            "completed_tasks": [],
+            "gaps": [],
+            "sync_score": 75,
+            "cross_insights": [],
+        }
+        projects.append(project)
+
+    pending = project.setdefault("pending_tasks", [])
+    completed = project.setdefault("completed_tasks", [])
+    existing_keys = {task_identity(t) for t in pending + completed}
+
+    synced_count = 0
+    for task in tasks:
+        mapped = map_task_for_website(task)
+        key = task_identity(mapped)
+        if key in existing_keys:
+            continue
+        pending.append(mapped)
+        existing_keys.add(key)
+        synced_count += 1
+
+    save_website_state(state)
+    return {
+        "status": "success",
+        "synced_count": synced_count,
+        "project_name": clean_project,
+    }
+
+
 def build_actions_markup(task: dict) -> InlineKeyboardMarkup:
-    row1 = [InlineKeyboardButton("✅ Sync to Notion", callback_data="sync_notion")]
+    row1 = [
+        InlineKeyboardButton("✅ Sync to Notion", callback_data="sync_notion"),
+        InlineKeyboardButton("🌐 Sync to Website", callback_data="sync_website"),
+    ]
     row2 = [InlineKeyboardButton("📅 Add to Calendar", url=to_calendar_url(task))]
     row3 = [InlineKeyboardButton("👤 Add Assignee", callback_data="follow_up"), InlineKeyboardButton("❌ Dismiss", callback_data="dismiss_card")]
     return InlineKeyboardMarkup([row1, row2, row3])
@@ -471,6 +651,11 @@ def render_group_card(tasks: list[dict], source_text: str, username: str) -> str
         lines.append(f"<b>🎯 Priority:</b> {html_escape(priority.capitalize())} {icon}")
         if should_show_details(task):
             lines.append(f"<b>🧾 Details:</b> {description}")
+        suggestion = task.get("assignee_suggestion")
+        if suggestion and (not task.get("owner") or str(task.get("owner")).lower() == "unassigned"):
+            lines.append(f"<b>🤝 Suggestion:</b> No assignee yet. Based on recent chat, assign to {html_escape(str(suggestion))}?")
+        elif (not task.get("owner") or str(task.get("owner")).lower() == "unassigned"):
+            lines.append("<b>👤 Assignee:</b> Need assignee")
         if follow_up:
             lines.append(f"<b>🔁 Follow-up:</b> {follow_up}")
 
@@ -530,6 +715,11 @@ def format_task_list_message(title: str, tasks: list[dict], source_text: str) ->
         lines.append(f"<b>🎯 Priority:</b> {html_escape(priority.capitalize())} {icon}")
         if should_show_details(task):
             lines.append(f"<b>🧾 Details:</b> {details}")
+        suggestion = task.get("assignee_suggestion")
+        if suggestion and (not task.get("owner") or str(task.get("owner")).lower() == "unassigned"):
+            lines.append(f"<b>🤝 Suggestion:</b> No assignee yet. Based on recent chat, assign to {html_escape(str(suggestion))}?")
+        elif (not task.get("owner") or str(task.get("owner")).lower() == "unassigned"):
+            lines.append("<b>👤 Assignee:</b> Need assignee")
         if follow_up:
             lines.append(f"<b>🔁 Follow-up:</b> {follow_up}")
 
@@ -552,6 +742,16 @@ async def set_reaction_safe(context: ContextTypes.DEFAULT_TYPE, chat_id: int, me
         pass
 
 
+async def edit_message_text_safe(context: ContextTypes.DEFAULT_TYPE, **kwargs):
+    try:
+        await context.bot.edit_message_text(**kwargs)
+    except BadRequest as exc:
+        # Telegram returns this when content/markup is identical; safe to ignore.
+        if "message is not modified" in str(exc).lower():
+            return
+        raise
+
+
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.effective_message
     if not message:
@@ -565,12 +765,16 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_type = (update.effective_chat.type if update.effective_chat else "private").lower()
     is_group_chat = chat_type in {"group", "supergroup"}
     chat_id = update.effective_chat.id if update.effective_chat else None
+    sender_name = message.from_user.username if message.from_user and message.from_user.username else "unknown"
+    if chat_id:
+        add_context_message(chat_id, sender_name, notes)
 
     # Follow-up mode: interpret normal replies as updates to the latest task card.
     state = CHAT_STATE.get(chat_id) if chat_id else None
     if state and apply_followup_updates(notes, state.get("tasks", [])):
         state["task_keys"] = {task_key(task) for task in state["tasks"]}
-        await context.bot.edit_message_text(
+        await edit_message_text_safe(
+            context,
             chat_id=chat_id,
             message_id=state["message_id"],
             text=format_task_list_message("✨ Mess2Master: Task Updated", state["tasks"], notes),
@@ -592,15 +796,17 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         lowered = notes.lower()
         if not any(word in lowered for word in TRIGGERS):
             return
-    default_owner = f"@{message.from_user.username}" if message.from_user and message.from_user.username else "Unassigned"
+    default_owner = "Unassigned" if is_group_chat else (f"@{message.from_user.username}" if message.from_user and message.from_user.username else "Unassigned")
     if chat_id and message.message_id:
         await set_reaction_safe(context, chat_id, message.message_id, "🧐")
 
     try:
         result = await build_ai_result(notes=notes, uploads=[])
-        local_tasks = extract_tasks_from_message(notes, default_owner)
+        context_buffer = list(get_context_buffer(chat_id)) if chat_id else []
+        local_tasks = extract_tasks_from_message(notes, default_owner, context_buffer=context_buffer)
 
         if local_tasks:
+            attach_assignee_suggestions(local_tasks, context_buffer)
             result["tasks"] = local_tasks
             result["project_name"] = result.get("project_name") or simplify_task_title(notes)
         elif result.get("tasks"):
@@ -613,6 +819,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if inferred_due:
                     task["due_date"] = f"{inferred_due} {inferred_time}" if inferred_time else inferred_due
                 task["owner"] = task.get("owner") or default_owner
+            attach_assignee_suggestions(result["tasks"], context_buffer)
 
         if chat_id and message.message_id:
             await set_reaction_safe(context, chat_id, message.message_id, "✅")
@@ -635,10 +842,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     return
                 state["tasks"].extend(new_tasks)
                 state["task_keys"].update(task_key(task) for task in new_tasks)
-                await context.bot.edit_message_text(
+                await edit_message_text_safe(
+                    context,
                     chat_id=chat_id,
                     message_id=state["message_id"],
-                    text=format_task_list_message("✨ Mess2Master: Task Detected", state["tasks"], notes),
                     text=format_task_list_message("✨ Mess2Master: Task Detected", state["tasks"], notes),
                     parse_mode=ParseMode.HTML,
                     reply_markup=build_actions_markup(state["tasks"][-1]),
@@ -650,7 +857,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             sent = await message.reply_text(
                 format_task_list_message("✨ Mess2Master: Task Detected", tasks, notes),
-                format_task_list_message("✨ Mess2Master: Task Detected", tasks, notes),
                 parse_mode=ParseMode.HTML,
                 reply_markup=build_actions_markup(tasks[0]),
             )
@@ -658,6 +864,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "message_id": sent.message_id,
                 "tasks": tasks,
                 "task_keys": {task_key(task) for task in tasks},
+                "project_name": result.get("project_name") or "Telegram Inbox",
             }
             return
 
@@ -740,6 +947,25 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.answer(result.get("message", "Notion sync failed"), show_alert=True)
         except Exception as exc:
             await query.answer(f"Notion sync failed: {exc}", show_alert=True)
+        return
+
+    if data == "sync_website" and query.message:
+        chat_id = query.message.chat_id
+        state = CHAT_STATE.get(chat_id)
+        if not state or not state.get("tasks"):
+            await query.answer("No tasks saved for this card.", show_alert=True)
+            return
+
+        try:
+            project_name = state.get("project_name") or "Telegram Inbox"
+            result = sync_tasks_to_website(state["tasks"], project_name)
+            if result.get("status") == "success":
+                count = result.get("synced_count", 0)
+                await query.answer(f"Synced {count} task(s) to website")
+            else:
+                await query.answer(result.get("message", "Website sync failed"), show_alert=True)
+        except Exception as exc:
+            await query.answer(f"Website sync failed: {exc}", show_alert=True)
         return
 
     if data == "follow_up" and query.message:

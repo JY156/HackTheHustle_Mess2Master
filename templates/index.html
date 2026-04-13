@@ -12,7 +12,7 @@
         <div class="nav-container">
             <a href="/" class="logo"><i class="fas fa-bolt"></i> Mess2Master</a>
             <div class="nav-actions">
-                <a href="/tasks" class="nav-link"><i class="fas fa-list-check"></i> View All Tasks</a>
+                <a href="/tasks" class="nav-link"><i class="fas fa-list-check"></i> Task Board</a>
                 <button id="resetSemesterBtn" class="btn-reset" title="Start fresh semester"><i class="fas fa-rotate-right"></i></button>
                 <span class="badge">Hack The Hustle 2026</span>
             </div>
@@ -37,26 +37,6 @@
         </div>
         </div>
 
-        <!-- Voice Meeting Card -->
-        <section class="card voice-section" style="margin-bottom: 1.5rem; background: linear-gradient(135deg, rgba(108,92,231,0.05), rgba(162,155,254,0.05)); border: 2px dashed var(--primary);">
-        <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
-            <div style="background: rgba(108,92,231,0.1); padding: 0.75rem; border-radius: 50%;">
-            <i class="fas fa-microphone" style="font-size: 1.5rem; color: var(--primary);"></i>
-            </div>
-            <div style="flex: 1; min-width: 200px;">
-            <h3 style="margin: 0 0 0.25rem;">Voice Meeting Notes</h3>
-            <p style="margin: 0; font-size: 0.9rem; color: var(--text-muted);">Click to start recording your discussion. AI will extract tasks instantly.</p>
-            </div>
-            <button id="startVoiceBtn" class="btn-primary" style="width: auto; padding: 0.6rem 1.2rem;">
-            <i class="fas fa-microphone"></i> Start Listening
-            </button>
-            <button id="stopVoiceBtn" class="btn-primary" style="width: auto; padding: 0.6rem 1.2rem; background: var(--danger); display: none;">
-            <i class="fas fa-stop"></i> Stop & Extract
-            </button>
-        </div>
-        <div id="voiceStatus" style="margin-top: 1rem; font-size: 0.9rem; color: var(--text-muted); min-height: 1.5rem;"></div>
-        <div id="liveTranscript" style="margin-top: 0.5rem; padding: 0.75rem; background: var(--surface); border-radius: 8px; max-height: 120px; overflow-y: auto; display: none; font-size: 0.9rem;"></div>
-        </section>
         <!-- Semester Setup Banner (shown only if not configured) -->
         <div id="semesterBanner" class="card semester-banner" style="display: none;">
             <h3><i class="fas fa-calendar-week"></i> Setup Your Semester</h3>
@@ -96,29 +76,29 @@
 
         <section class="card upload-panel upload-panel-hero">
             <form id="uploadForm" enctype="multipart/form-data">
-                
-                <!-- Project Selector -->
                 <div class="form-group">
-                    <label>Project Assignment</label>
-                    <div class="project-selector">
-                        <div style="flex: 1;">
-                            <label style="font-size: 0.75rem; margin-bottom: 0.2rem; color: var(--text-muted);">Select Existing</label>
-                            <select id="projectSelect" class="form-control">
-                                <option value="">-- None --</option>
-                                {% for name in project_names %}
-                                <option value="{{ name }}">{{ name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div style="flex: 1;">
-                            <label style="font-size: 0.75rem; margin-bottom: 0.2rem; color: var(--text-muted);">OR Create New</label>
-                            <input type="text" id="newProjectInput" class="form-control" placeholder="Type new project name...">
-                        </div>
-                    </div>
-                    <small id="projectHint" class="form-hint">Select existing to add more, or type a new name to create a project</small>
+                    <label for="projectNameInput">Step 1: Which project is this for?</label>
+                    <input id="projectNameInput" name="project_name" class="form-control" list="projectNameOptions" placeholder="Type or choose a project..." required>
+                    <datalist id="projectNameOptions">
+                        {% for name in project_names %}
+                        <option value="{{ name }}"></option>
+                        {% endfor %}
+                    </datalist>
+                    <small id="projectHint" class="form-hint">If the name does not exist yet, Mess2Master will create it.</small>
                 </div>
 
-                <!-- File Upload -->
+                <label>Step 2: Add Intelligence</label>
+                <div class="input-mode-row">
+                    <button type="button" id="startVoiceBtn" class="btn-sm input-mode-btn live-listen-btn">
+                        <i class="fas fa-microphone"></i>
+                        <span>Live Listen</span>
+                        <span class="live-listen-hint">AI extracts your meeting into To-Do tasks and Key Risks</span>
+                    </button>
+                    <button type="button" id="stopVoiceBtn" class="btn-sm input-mode-btn" style="display:none; border-color: var(--danger); color: var(--danger);"><i class="fas fa-stop"></i> Stop</button>
+                </div>
+                <div id="voiceStatus" class="submit-status" aria-live="polite"></div>
+                <div id="liveTranscript" class="inline-transcript" style="display:none;"></div>
+
                 <div class="drop-zone" id="dropZone">
                     <i class="fas fa-cloud-arrow-up"></i>
                     <p>Drop your project file to begin</p>
@@ -126,7 +106,6 @@
                     <span class="file-hint" id="fileList">Supports PDF, DOC, DOCX, TXT, MP3, WAV, M4A, OGG · up to 10 files</span>
                 </div>
 
-                <!-- Notes -->
                 <div class="form-group">
                     <label>Meeting Notes / Chat Logs</label>
                     <textarea name="notes" rows="4" placeholder="Paste rough notes, roles, and deadlines..."></textarea>
@@ -142,19 +121,15 @@
         <section class="hero">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
                 <div>
-                    <h1>Current Focus</h1>
                     <p style="color: var(--text-muted);">
                         {% if semester.start and semester.end %}
-                            {{ semester.start[:4] }} • {{ (semester.end[:7] | replace('-', ' ')) }} Semester
+                            Semester: {{ semester.start }} to {{ semester.end }}
                         {% else %}
                             Semester not configured
                         {% endif %}
                         • {{ projects|length }} project{% if projects|length > 1 %}s{% endif %}
                     </p>
                 </div>
-                <a href="/tasks" class="btn-sm" style="display: inline-block; text-decoration: none;">
-                    View All Projects & Tasks →
-                </a>
             </div>
         </section>
 
@@ -162,27 +137,28 @@
         <section class="card upload-panel upload-panel-inline">
             <h2><i class="fas fa-cloud-upload-alt"></i> Add to Project</h2>
             <form id="uploadForm" enctype="multipart/form-data">
-                
-                <!-- Project Selector: Defaults to "-- None --" -->
                 <div class="form-group">
-                    <label>Select Project or Create New</label>
-                    <div class="project-selector">
-                        <div style="flex: 1;">
-                            <label style="font-size: 0.75rem; margin-bottom: 0.2rem; color: var(--text-muted);">Add to Existing</label>
-                            <select id="projectSelect" class="form-control">
-                                <option value="">-- None --</option>
-                                {% for name in project_names %}
-                                <option value="{{ name }}">{{ name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div style="flex: 1;">
-                            <label style="font-size: 0.75rem; margin-bottom: 0.2rem; color: var(--text-muted);">OR Create New</label>
-                            <input type="text" id="newProjectInput" class="form-control" placeholder="Type new project name...">
-                        </div>
-                    </div>
-                    <small id="projectHint" class="form-hint">Select existing to add more, or type a new name to create a project</small>
+                    <label for="projectNameInput">Step 1: Which project is this for?</label>
+                    <input id="projectNameInput" name="project_name" class="form-control" list="projectNameOptions" placeholder="Type or choose a project..." required>
+                    <datalist id="projectNameOptions">
+                        {% for name in project_names %}
+                        <option value="{{ name }}"></option>
+                        {% endfor %}
+                    </datalist>
+                    <small id="projectHint" class="form-hint">If the name does not exist yet, Mess2Master will create it.</small>
                 </div>
+
+                <label>Step 2: Add Intelligence</label>
+                <div class="input-mode-row">
+                    <button type="button" id="startVoiceBtn" class="btn-sm input-mode-btn live-listen-btn">
+                        <i class="fas fa-microphone"></i>
+                        <span>Live Listen</span>
+                        <span class="live-listen-hint">AI extracts your meeting into To-Do tasks and Key Risks</span>
+                    </button>
+                    <button type="button" id="stopVoiceBtn" class="btn-sm input-mode-btn" style="display:none; border-color: var(--danger); color: var(--danger);"><i class="fas fa-stop"></i> Stop</button>
+                </div>
+                <div id="voiceStatus" class="submit-status" aria-live="polite"></div>
+                <div id="liveTranscript" class="inline-transcript" style="display:none;"></div>
 
                 <div class="drop-zone" id="dropZone">
                     <i class="fas fa-file-arrow-up"></i>
@@ -216,24 +192,58 @@
                             {% if recent.pending_tasks %}
                                 {% for t in recent.pending_tasks[:5] %}
                                 <div class="task-item {{ t.priority }}">
-                                    <div class="task-content">
-                                        <div class="task-info">
-                                            <strong>{{ t.title or t.task }}</strong>
+                                    <div class="task-view">
+                                        <div class="task-content">
+                                            <div class="task-info">
+                                                <strong>{{ t.title or t.task }}</strong>
+                                            </div>
+                                            <div class="task-meta">
+                                                <span>{{ t.deadline or t.due_date or 'TBD' }}</span>
+                                                <span>Assignee: {{ t.owner or 'Unassigned' }}</span>
+                                                <span class="badge {{ t.priority }}">{{ (t.priority or 'medium').upper() }}</span>
+                                            </div>
                                         </div>
-                                        <div class="task-meta">
-                                            <span>{{ t.deadline or t.due_date or 'TBD' }}</span>
-                                            <span>Assignee: {{ t.owner or 'Unassigned' }}</span>
-                                            <span class="badge {{ t.priority }}">{{ (t.priority or 'medium').upper() }}</span>
-                                        </div>
+                                        <button type="button" class="btn-edit-toggle" data-edit-toggle title="Edit task">
+                                            <i class="fas fa-pencil"></i>
+                                        </button>
                                     </div>
+                                    <form class="task-edit-form" data-project="{{ recent.project_name }}" data-task-id="{{ t.id }}" hidden>
+                                        <div class="task-content">
+                                            <div class="task-info">
+                                                <label class="sr-only">Task title</label>
+                                                <input type="text" name="title" class="form-control" value="{{ t.title or t.task }}" required>
+                                            </div>
+                                            <div class="task-meta">
+                                                <span>
+                                                    <label class="sr-only">Deadline</label>
+                                                    <input type="date" name="deadline" class="form-control" value="{{ (t.deadline or t.due_date or '')[:10] }}">
+                                                </span>
+                                                <span>
+                                                    <label class="sr-only">Assignee</label>
+                                                    <input type="text" name="owner" class="form-control" value="{{ t.owner or '' }}" placeholder="Assignee">
+                                                </span>
+                                                <span>
+                                                    <label class="sr-only">Priority</label>
+                                                    <select name="priority" class="form-control">
+                                                        {% for level in ['high', 'medium', 'low'] %}
+                                                        <option value="{{ level }}" {% if (t.priority or 'medium') == level %}selected{% endif %}>{{ level|upper }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap; margin-top:0.5rem;">
+                                            <button type="submit" class="btn-sm task-save-btn"><i class="fas fa-floppy-disk"></i> Save</button>
+                                            <button type="button" class="btn-sm task-delete-btn" data-delete-task><i class="fas fa-trash"></i> Delete</button>
+                                            <button type="button" class="btn-sm task-cancel-btn" data-cancel-edit>Cancel</button>
+                                            <span class="task-save-status" aria-live="polite"></span>
+                                        </div>
+                                    </form>
                                     <button class="btn-calendar-icon" type="button" data-title="{{ t.title or t.task }}" data-date="{{ t.deadline or t.due_date }}" title="Add to Calendar">
                                         <i class="fas fa-calendar-plus"></i>
                                     </button>
                                 </div>
                                 {% endfor %}
-                                {% if recent.pending_tasks|length > 5 %}
-                                <p class="empty-state"><a href="/tasks#{{ recent.project_name|replace(' ', '-') }}">View all {{ recent.pending_tasks|length }} tasks →</a></p>
-                                {% endif %}
                             {% else %}
                                 <p class="empty-state">All caught up! 🎉</p>
                             {% endif %}
@@ -243,26 +253,15 @@
                     <div class="column">
                         <h3>Key Risks</h3>
                         <div class="gaps-section">
-                            {% if recent.gaps %}
-                                {% for g in recent.gaps %}
+                            {% if recent.display_gaps %}
+                                {% for g in recent.display_gaps %}
                                 <div class="gap-item">
-                                    <strong>⚠️ {{ g.issue }}</strong>
-                                    <p>💡 {{ g.suggestion }}</p>
+                                    <strong>⚠️ {{ g.issue | replace('owners', 'assignees') | replace('owner', 'assignee') | replace('Owner', 'Assignee') }}</strong>
+                                    <p>💡 {% if "Owner + by Date" in g.suggestion %}Review and update assignees and deadlines directly in the editable task cards.{% else %}{{ g.suggestion | replace('owners', 'assignees') | replace('owner', 'assignee') | replace('Owner', 'Assignee') }}{% endif %}</p>
                                 </div>
                                 {% endfor %}
                             {% else %}
                                 <p class="empty-state">No risks detected. Great job!</p>
-                            {% endif %}
-                        </div>
-
-                        <h3 style="margin-top: 1rem;">Insights</h3>
-                        <div class="insights-section">
-                            {% if recent.cross_insights %}
-                                {% for i in recent.cross_insights[:2] %}
-                                <p class="insight">• {{ i }}</p>
-                                {% endfor %}
-                            {% else %}
-                                <p class="empty-state">No insights yet.</p>
                             {% endif %}
                         </div>
                     </div>
@@ -274,21 +273,8 @@
                         <i class="fas fa-database"></i> Sync {{ recent.project_name }} to Notion
                     </button>
                     <p id="syncStatus-recent" class="sync-status" aria-live="polite"></p>
-                    <a href="/tasks#{{ recent.project_name|replace(' ', '-') }}" class="btn-sm" style="display: inline-block; text-decoration: none; margin-left: 0.5rem;">
-                        View Full Task Board →
-                    </a>
                 </div>
             </section>
-            
-            <!-- Link to View All Projects -->
-            {% if projects|length > 1 %}
-            <section class="card" style="text-align: center; padding: 2rem;">
-                <p style="color: var(--text-muted); margin-bottom: 1rem;">You have {{ projects|length - 1 }} other project{% if projects|length > 2 %}s{% endif %}</p>
-                <a href="/tasks" class="btn-primary" style="display: inline-block; text-decoration: none; width: auto; padding: 0.75rem 2rem;">
-                    View All Projects & Tasks →
-                </a>
-            </section>
-            {% endif %}
         </section>
         {% endif %}
     </main>

@@ -212,22 +212,22 @@ class Mess2MasterAI:
             ts = int(time.time())
             extracted = [{
                 "id": f"ts_{ts}",
-                "title": "Review meeting transcript and assign owners",
-                "description": "AI fallback mode could not parse clear action lines. Confirm owners and deadlines manually.",
+                "title": "Review meeting transcript and assign assignees",
+                "description": "AI fallback mode could not parse clear action lines. Confirm assignees and deadlines manually.",
                 "deadline": sem_start,
                 "due_date_source": "suggested",
                 "priority": "high",
                 "status": "pending",
                 "owner": None,
-                "follow_up": "Share one sentence per task: Owner + Action + Date"
+                "follow_up": "Share one sentence per task: Assignee + Action + Date"
             }]
 
         payload = {
             "project_name": "Mess2Master Fallback",
             "tasks": extracted[:10],
-            "gaps": [{"issue": "Some tasks may still miss clear owners/dates", "suggestion": "Add explicit 'Owner + by Date' phrasing for each action item"}],
+            "gaps": [{"issue": "Some tasks may still miss clear assignees or due dates", "suggestion": "Review and update assignees and deadlines directly in the editable task cards."}],
             "sync_score": 70,
-            "cross_insights": ["Fallback parsing used transcript-only extraction due to model unavailability"]
+            "cross_insights": []
         }
         payload["_meta"] = diagnostics or {}
         payload["_meta"]["fallback"] = True

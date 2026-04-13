@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const form = document.getElementById('uploadForm');
     const submitBtn = document.getElementById('submitBtn');
     const submitStatus = document.getElementById('submitStatus');
+    const projectNameInput = document.getElementById('projectNameInput');
     const projectSelect = document.getElementById('projectSelect');
     const newProjectInput = document.getElementById('newProjectInput');
     const projectHint = document.getElementById('projectHint');
@@ -155,18 +156,34 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (type) submitStatus.classList.add(type);
     }
 
+    function setNotionSuccessStatus(statusEl, syncedCount, dashboardUrl) {
+        if (!statusEl) return;
+        statusEl.className = 'sync-status success';
+        const safeUrl = (dashboardUrl || '').trim();
+        if (/^https?:\/\//i.test(safeUrl)) {
+            statusEl.innerHTML = `Successfully synced! <a href="${safeUrl}" target="_blank" rel="noopener noreferrer">View your Notion Dashboard ↗</a>`;
+            return;
+        }
+        statusEl.textContent = `✅ Synced ${syncedCount || 'all'} tasks to Notion`;
+    }
+
     // Restore status after reload
     const pendingStatus = window.sessionStorage.getItem('submitStatusMessage');
-    const shouldScroll = window.sessionStorage.getItem('scrollToResults') === '1';
+    const highlightSlug = window.sessionStorage.getItem('highlightProjectSlug');
     if (pendingStatus) {
         setSubmitStatus(pendingStatus, 'success');
         window.sessionStorage.removeItem('submitStatusMessage');
     }
-    if (shouldScroll && projectsList) {
-        projectsList.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        projectsList.classList.add('just-updated');
-        setTimeout(() => projectsList.classList.remove('just-updated'), 1800);
-        window.sessionStorage.removeItem('scrollToResults');
+    if (highlightSlug && projectsList) {
+        const target = document.getElementById(highlightSlug) || projectsList;
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        target.classList.add('just-updated');
+        setTimeout(() => target.classList.remove('just-updated'), 1800);
+        window.sessionStorage.removeItem('highlightProjectSlug');
+    }
+
+    function slugifyProjectName(name) {
+        return (name || '').trim().replace(/\s+/g, '-');
     }
 
     // === Form Submit (Stay on Index, Show Updated Project) ===
@@ -175,10 +192,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!form.checkValidity()) { form.reportValidity(); setSubmitStatus('Please fill all required fields.', 'error'); return; }
 
         // 🔑 Smart project name resolution: New Input > Dropdown
+        const unifiedProjectVal = projectNameInput?.value.trim();
         const newProjectVal = newProjectInput?.value.trim();
         const existingProjectVal = projectSelect?.value;
         let projectName = '';
-        if (newProjectVal) { projectName = newProjectVal; }
+        if (unifiedProjectVal) { projectName = unifiedProjectVal; }
+        else if (newProjectVal) { projectName = newProjectVal; }
         else if (existingProjectVal) { projectName = existingProjectVal; }
 
         if (!projectName) {
@@ -209,6 +228,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (received) msg += ` Files: ${received}`;
                 
                 setSubmitStatus(`${msg} Refreshing view...`, 'success');
+                window.sessionStorage.setItem('highlightProjectSlug', slugifyProjectName(data.project_name || projectName));
                 
                 // ✅ STAY ON INDEX: Just reload to show updated project
                 setTimeout(() => window.location.reload(), 1200);
@@ -251,8 +271,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const data = await res.json();
 
                 if (res.ok && data.status === 'success') {
-                    syncStatus.textContent = `✅ Synced ${data.synced_count || 'all'} tasks to Notion`;
-                    syncStatus.className = 'sync-status success';
+                    setNotionSuccessStatus(syncStatus, data.synced_count, data.dashboard_url);
                 } else {
                     // Fallback: copy markdown to clipboard
                     if (data.clipboard_markdown) {
@@ -293,7 +312,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' }
                 });
-                
                 // 🔍 Check if response is actually JSON
                 const contentType = res.headers.get("content-type");
                 if (!contentType || !contentType.includes("application/json")) {
@@ -305,8 +323,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const data = await res.json();
 
                 if (res.ok && data.status === 'success') {
-                    statusEl.textContent = `✅ Synced ${data.synced_count || 'all'} tasks to Notion`;
-                    statusEl.className = 'sync-status success';
+                    setNotionSuccessStatus(statusEl, data.synced_count, data.dashboard_url);
                 } else {
                     // Fallback: copy markdown to clipboard
                     if (data.clipboard_markdown) {
@@ -326,6 +343,118 @@ document.addEventListener('DOMContentLoaded', async () => {
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fas fa-database"></i> Sync to Notion';
+            }
+        });
+    });
+
+    // === Editable Task Cards ===
+    document.querySelectorAll('[data-edit-toggle]').forEach((button) => {
+        button.addEventListener('click', () => {
+            const taskItem = button.closest('.task-item');
+            const viewEl = taskItem?.querySelector('.task-view');
+            const formEl = taskItem?.querySelector('.task-edit-form');
+            if (!taskItem || !viewEl || !formEl) return;
+            taskItem.classList.add('is-editing');
+            viewEl.hidden = true;
+            formEl.hidden = false;
+            const firstField = formEl.querySelector('input, select, textarea');
+            firstField?.focus();
+        });
+    });
+
+    document.querySelectorAll('[data-cancel-edit]').forEach((button) => {
+        button.addEventListener('click', () => {
+            const taskItem = button.closest('.task-item');
+            const viewEl = taskItem?.querySelector('.task-view');
+            const formEl = taskItem?.querySelector('.task-edit-form');
+            if (!taskItem || !viewEl || !formEl) return;
+            taskItem.classList.remove('is-editing');
+            formEl.hidden = true;
+            viewEl.hidden = false;
+        });
+    });
+
+    document.querySelectorAll('.task-edit-form').forEach((form) => {
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            const projectName = form.dataset.project;
+            const taskId = form.dataset.taskId;
+            const statusEl = form.querySelector('.task-save-status');
+            const saveBtn = form.querySelector('.task-save-btn');
+            const formData = new FormData(form);
+
+            if (!projectName || !taskId) return;
+
+            saveBtn.disabled = true;
+            if (statusEl) statusEl.textContent = 'Saving...';
+
+            try {
+                const res = await fetch('/api/tasks/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        project_name: projectName,
+                        task_id: taskId,
+                        title: formData.get('title') || '',
+                        deadline: formData.get('deadline') || '',
+                        owner: formData.get('owner') || '',
+                        priority: formData.get('priority') || 'medium',
+                    }),
+                });
+                const data = await res.json();
+
+                if (!res.ok || data.status !== 'success') {
+                    throw new Error(data.error || 'Unable to save task');
+                }
+
+                if (statusEl) statusEl.textContent = 'Saved';
+                setTimeout(() => window.location.reload(), 400);
+            } catch (err) {
+                console.error(err);
+                if (statusEl) statusEl.textContent = `Error: ${err.message}`;
+            } finally {
+                saveBtn.disabled = false;
+            }
+        });
+    });
+
+    document.querySelectorAll('[data-delete-task]').forEach((button) => {
+        button.addEventListener('click', async () => {
+            const taskItem = button.closest('.task-item');
+            const form = taskItem?.querySelector('.task-edit-form');
+            const statusEl = form?.querySelector('.task-save-status');
+            const projectName = form?.dataset.project;
+            const taskId = form?.dataset.taskId;
+
+            if (!form || !projectName || !taskId) return;
+            if (!confirm('Delete this task?')) return;
+
+            button.disabled = true;
+            if (statusEl) statusEl.textContent = 'Deleting...';
+
+            try {
+                const res = await fetch('/api/tasks/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        project_name: projectName,
+                        task_id: taskId,
+                    }),
+                });
+                const data = await res.json();
+
+                if (!res.ok || data.status !== 'deleted') {
+                    throw new Error(data.error || 'Unable to delete task');
+                }
+
+                if (statusEl) statusEl.textContent = 'Deleted';
+                setTimeout(() => window.location.reload(), 300);
+            } catch (err) {
+                console.error(err);
+                if (statusEl) statusEl.textContent = `Error: ${err.message}`;
+            } finally {
+                button.disabled = false;
             }
         });
     });

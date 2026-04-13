@@ -12,7 +12,7 @@
         <div class="nav-container">
             <a href="/" class="logo"><i class="fas fa-bolt"></i> Mess2Master</a>
             <div class="nav-actions">
-                <a href="/" class="nav-link"><i class="fas fa-arrow-left"></i> Back to Upload</a>
+                <a href="/" class="nav-link"><i class="fas fa-arrow-left"></i> Home</a>
                 <button id="resetSemesterBtn" class="btn-reset" title="Start fresh semester"><i class="fas fa-rotate-right"></i></button>
                 <span class="badge">Hack The Hustle 2026</span>
             </div>
@@ -54,16 +54,53 @@
                 {% if master_tasks %}
                     {% for t in master_tasks %}
                     <div class="task-item {{ t.priority }}">
-                        <div class="task-content">
-                            <div class="task-info">
-                                <strong>{{ t.title or t.task }}</strong>
+                        <div class="task-view">
+                            <div class="task-content">
+                                <div class="task-info">
+                                    <strong>{{ t.title or t.task }}</strong>
+                                </div>
+                                <div class="task-meta">
+                                    <span>{{ t.deadline or t.due_date or 'TBD' }}</span>
+                                    <span>Assignee: {{ t.owner or 'Unassigned' }}</span>
+                                    <span class="badge {{ t.priority }}">{{ (t.priority or 'medium').upper() }}</span>
+                                </div>
                             </div>
-                            <div class="task-meta">
-                                <span>{{ t.deadline or t.due_date or 'TBD' }}</span>
-                                <span>Assignee: {{ t.owner or 'Unassigned' }}</span>
-                                <span class="badge {{ t.priority }}">{{ (t.priority or 'medium').upper() }}</span>
-                            </div>
+                            <button type="button" class="btn-edit-toggle" data-edit-toggle title="Edit task">
+                                <i class="fas fa-pencil"></i>
+                            </button>
                         </div>
+                        <form class="task-edit-form" data-project="{{ t.project }}" data-task-id="{{ t.id }}" hidden>
+                            <div class="task-content">
+                                <div class="task-info">
+                                    <label class="sr-only">Task title</label>
+                                    <input type="text" name="title" class="form-control" value="{{ t.title or t.task }}" required>
+                                </div>
+                                <div class="task-meta">
+                                    <span>
+                                        <label class="sr-only">Deadline</label>
+                                        <input type="date" name="deadline" class="form-control" value="{{ (t.deadline or t.due_date or '')[:10] }}">
+                                    </span>
+                                    <span>
+                                        <label class="sr-only">Assignee</label>
+                                        <input type="text" name="owner" class="form-control" value="{{ t.owner or '' }}" placeholder="Assignee">
+                                    </span>
+                                    <span>
+                                        <label class="sr-only">Priority</label>
+                                        <select name="priority" class="form-control">
+                                            {% for level in ['high', 'medium', 'low'] %}
+                                            <option value="{{ level }}" {% if (t.priority or 'medium') == level %}selected{% endif %}>{{ level|upper }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </span>
+                                </div>
+                            </div>
+                            <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap; margin-top:0.5rem;">
+                                <button type="submit" class="btn-sm task-save-btn"><i class="fas fa-floppy-disk"></i> Save</button>
+                                <button type="button" class="btn-sm task-delete-btn" data-delete-task><i class="fas fa-trash"></i> Delete</button>
+                                <button type="button" class="btn-sm task-cancel-btn" data-cancel-edit>Cancel</button>
+                                <span class="task-save-status" aria-live="polite"></span>
+                            </div>
+                        </form>
                         <button class="btn-calendar-icon" type="button" data-title="{{ t.title or t.task }}" data-date="{{ t.deadline or t.due_date }}" title="Add to Calendar">
                             <i class="fas fa-calendar-plus"></i>
                         </button>
@@ -91,16 +128,53 @@
                         {% if p.pending_tasks %}
                             {% for t in p.pending_tasks %}
                             <div class="task-item {{ t.priority }}">
-                                <div class="task-content">
-                                    <div class="task-info">
-                                        <strong>{{ t.title or t.task }}</strong>
+                                <div class="task-view">
+                                    <div class="task-content">
+                                        <div class="task-info">
+                                            <strong>{{ t.title or t.task }}</strong>
+                                        </div>
+                                        <div class="task-meta">
+                                            <span>{{ t.deadline or t.due_date or 'TBD' }}</span>
+                                            <span>Assignee: {{ t.owner or 'Unassigned' }}</span>
+                                            <span class="badge {{ t.priority }}">{{ (t.priority or 'medium').upper() }}</span>
+                                        </div>
                                     </div>
-                                    <div class="task-meta">
-                                        <span>{{ t.deadline or t.due_date or 'TBD' }}</span>
-                                        <span>Assignee: {{ t.owner or 'Unassigned' }}</span>
-                                        <span class="badge {{ t.priority }}">{{ (t.priority or 'medium').upper() }}</span>
-                                    </div>
+                                    <button type="button" class="btn-edit-toggle" data-edit-toggle title="Edit task">
+                                        <i class="fas fa-pencil"></i>
+                                    </button>
                                 </div>
+                                <form class="task-edit-form" data-project="{{ p.project_name }}" data-task-id="{{ t.id }}" hidden>
+                                    <div class="task-content">
+                                        <div class="task-info">
+                                            <label class="sr-only">Task title</label>
+                                            <input type="text" name="title" class="form-control" value="{{ t.title or t.task }}" required>
+                                        </div>
+                                        <div class="task-meta">
+                                            <span>
+                                                <label class="sr-only">Deadline</label>
+                                                <input type="date" name="deadline" class="form-control" value="{{ (t.deadline or t.due_date or '')[:10] }}">
+                                            </span>
+                                            <span>
+                                                <label class="sr-only">Assignee</label>
+                                                <input type="text" name="owner" class="form-control" value="{{ t.owner or '' }}" placeholder="Assignee">
+                                            </span>
+                                            <span>
+                                                <label class="sr-only">Priority</label>
+                                                <select name="priority" class="form-control">
+                                                    {% for level in ['high', 'medium', 'low'] %}
+                                                    <option value="{{ level }}" {% if (t.priority or 'medium') == level %}selected{% endif %}>{{ level|upper }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap; margin-top:0.5rem;">
+                                        <button type="submit" class="btn-sm task-save-btn"><i class="fas fa-floppy-disk"></i> Save</button>
+                                        <button type="button" class="btn-sm task-delete-btn" data-delete-task><i class="fas fa-trash"></i> Delete</button>
+                                        <button type="button" class="btn-sm task-cancel-btn" data-cancel-edit>Cancel</button>
+                                        <span class="task-save-status" aria-live="polite"></span>
+                                    </div>
+                                </form>
                                 <button class="btn-calendar-icon" type="button" data-title="{{ t.title or t.task }}" data-date="{{ t.deadline or t.due_date }}" title="Add to Calendar">
                                     <i class="fas fa-calendar-plus"></i>
                                 </button>
@@ -112,30 +186,19 @@
                     </div>
                 </div>
 
-                <!-- Right Column: Risks & Insights -->
+                <!-- Right Column: Risks -->
                 <div class="column">
                     <h3>Key Risks</h3>
                     <div class="gaps-section">
-                        {% if p.gaps %}
-                            {% for g in p.gaps %}
+                        {% if p.display_gaps %}
+                            {% for g in p.display_gaps %}
                             <div class="gap-item">
-                                <strong>⚠️ {{ g.issue }}</strong>
-                                <p style="color: var(--text-muted); font-size: 0.84rem; margin: 0;">💡 {{ g.suggestion }}</p>
+                                <strong>⚠️ {{ g.issue | replace('owners', 'assignees') | replace('owner', 'assignee') | replace('Owner', 'Assignee') }}</strong>
+                                <p style="color: var(--text-muted); font-size: 0.84rem; margin: 0;">💡 {% if "Owner + by Date" in g.suggestion %}Review and update assignees and deadlines directly in the editable task cards.{% else %}{{ g.suggestion | replace('owners', 'assignees') | replace('owner', 'assignee') | replace('Owner', 'Assignee') }}{% endif %}</p>
                             </div>
                             {% endfor %}
                         {% else %}
                             <p class="empty-state">No risks detected.</p>
-                        {% endif %}
-                    </div>
-
-                    <h3 style="margin-top: 1rem;">Insights</h3>
-                    <div class="insights-section">
-                        {% if p.cross_insights %}
-                            {% for i in p.cross_insights %}
-                            <p class="insight">• {{ i }}</p>
-                            {% endfor %}
-                        {% else %}
-                            <p class="empty-state">No insights yet.</p>
                         {% endif %}
                     </div>
                 </div>

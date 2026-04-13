@@ -217,6 +217,67 @@ input:focus, textarea:focus, select:focus {
     color: var(--text-muted);
 }
 
+.input-mode-row {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin: 0.5rem 0 0.8rem;
+}
+
+.input-mode-btn {
+    width: auto;
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--text);
+}
+
+.input-mode-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.live-listen-btn {
+    width: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    overflow: hidden;
+    white-space: nowrap;
+    max-width: 200px;
+    transition: max-width 0.28s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.live-listen-hint {
+    max-width: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-width 0.28s ease, opacity 0.2s ease;
+    font-weight: 500;
+    color: var(--text-muted);
+}
+
+.live-listen-btn:hover,
+.live-listen-btn:focus-visible {
+    max-width: 720px;
+}
+
+.live-listen-btn:hover .live-listen-hint,
+.live-listen-btn:focus-visible .live-listen-hint {
+    max-width: 460px;
+    opacity: 1;
+}
+
+.inline-transcript {
+    margin: 0.4rem 0 0.8rem;
+    padding: 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    max-height: 120px;
+    overflow-y: auto;
+    font-size: 0.9rem;
+}
+
 /* === BUTTONS (Main Style) === */
 button[type="submit"], .btn-primary, .btn-calendar, .btn-sync-notion {
     width: 100%;
@@ -313,6 +374,107 @@ button[type="submit"]:disabled, .btn-primary:disabled, .btn-sync-notion:disabled
     align-items: center;
     font-size: 0.79rem;
     color: var(--text-muted);
+}
+
+.task-edit-form {
+    width: 100%;
+}
+
+.task-view {
+    width: 100%;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+}
+
+.task-item.is-editing {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.task-item.is-editing .task-view,
+.task-item.is-editing .btn-calendar-icon {
+    display: none;
+}
+
+.task-item.is-editing .task-edit-form {
+    display: block;
+}
+
+.task-edit-form .task-content {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.task-edit-form .task-info,
+.task-edit-form .task-meta {
+    width: 100%;
+}
+
+.task-edit-form .task-info input,
+.task-edit-form .task-meta input,
+.task-edit-form .task-meta select {
+    width: 100%;
+}
+
+.task-edit-form .task-meta > span {
+    min-width: 0;
+    flex: 1;
+}
+
+.task-edit-form .task-meta {
+    justify-content: flex-start;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.task-save-status {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
+
+.btn-edit-toggle,
+.btn-cancel-btn {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    border-radius: 10px;
+    padding: 0.45rem 0.6rem;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.btn-edit-toggle:hover,
+.btn-cancel-btn:hover {
+    color: var(--primary);
+    border-color: var(--primary);
+}
+
+.task-delete-btn {
+    border-color: #f2b3b3;
+    color: #9f2626;
+}
+
+.task-delete-btn:hover {
+    border-color: #d64a4a;
+    color: #d64a4a;
+}
+
+.task-item[hidden] {
+    display: none;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
 }
 .badge {
     padding: 0.1rem 0.42rem;

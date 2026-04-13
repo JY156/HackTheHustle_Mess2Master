@@ -51,6 +51,17 @@ function filterTasks(projectSlug) {
 // === Main DOMContentLoaded Handler ===
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Tasks.js loaded');
+
+    function setNotionSuccessStatus(statusEl, syncedCount, dashboardUrl) {
+        if (!statusEl) return;
+        statusEl.className = 'sync-status success';
+        const safeUrl = (dashboardUrl || '').trim();
+        if (/^https?:\/\//i.test(safeUrl)) {
+            statusEl.innerHTML = `Successfully synced! <a href="${safeUrl}" target="_blank" rel="noopener noreferrer">View your Notion Dashboard ↗</a>`;
+            return;
+        }
+        statusEl.textContent = `✅ Synced ${syncedCount || 'all'} tasks to Notion`;
+    }
     
     // === Filter Button Click Handlers ===
     document.querySelectorAll('.filter-btn').forEach(btn => {
@@ -97,6 +108,118 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // === Editable Task Cards ===
+    document.querySelectorAll('[data-edit-toggle]').forEach((button) => {
+        button.addEventListener('click', () => {
+            const taskItem = button.closest('.task-item');
+            const viewEl = taskItem?.querySelector('.task-view');
+            const formEl = taskItem?.querySelector('.task-edit-form');
+            if (!taskItem || !viewEl || !formEl) return;
+            taskItem.classList.add('is-editing');
+            viewEl.hidden = true;
+            formEl.hidden = false;
+            const firstField = formEl.querySelector('input, select, textarea');
+            firstField?.focus();
+        });
+    });
+
+    document.querySelectorAll('[data-cancel-edit]').forEach((button) => {
+        button.addEventListener('click', () => {
+            const taskItem = button.closest('.task-item');
+            const viewEl = taskItem?.querySelector('.task-view');
+            const formEl = taskItem?.querySelector('.task-edit-form');
+            if (!taskItem || !viewEl || !formEl) return;
+            taskItem.classList.remove('is-editing');
+            formEl.hidden = true;
+            viewEl.hidden = false;
+        });
+    });
+
+    document.querySelectorAll('.task-edit-form').forEach((form) => {
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            const projectName = form.dataset.project;
+            const taskId = form.dataset.taskId;
+            const statusEl = form.querySelector('.task-save-status');
+            const saveBtn = form.querySelector('.task-save-btn');
+            const formData = new FormData(form);
+
+            if (!projectName || !taskId) return;
+
+            saveBtn.disabled = true;
+            if (statusEl) statusEl.textContent = 'Saving...';
+
+            try {
+                const res = await fetch('/api/tasks/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        project_name: projectName,
+                        task_id: taskId,
+                        title: formData.get('title') || '',
+                        deadline: formData.get('deadline') || '',
+                        owner: formData.get('owner') || '',
+                        priority: formData.get('priority') || 'medium',
+                    }),
+                });
+                const data = await res.json();
+
+                if (!res.ok || data.status !== 'success') {
+                    throw new Error(data.error || 'Unable to save task');
+                }
+
+                if (statusEl) statusEl.textContent = 'Saved';
+                setTimeout(() => window.location.reload(), 400);
+            } catch (err) {
+                console.error(err);
+                if (statusEl) statusEl.textContent = `Error: ${err.message}`;
+            } finally {
+                saveBtn.disabled = false;
+            }
+        });
+    });
+
+    document.querySelectorAll('[data-delete-task]').forEach((button) => {
+        button.addEventListener('click', async () => {
+            const taskItem = button.closest('.task-item');
+            const form = taskItem?.querySelector('.task-edit-form');
+            const statusEl = form?.querySelector('.task-save-status');
+            const projectName = form?.dataset.project;
+            const taskId = form?.dataset.taskId;
+
+            if (!form || !projectName || !taskId) return;
+            if (!confirm('Delete this task?')) return;
+
+            button.disabled = true;
+            if (statusEl) statusEl.textContent = 'Deleting...';
+
+            try {
+                const res = await fetch('/api/tasks/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        project_name: projectName,
+                        task_id: taskId,
+                    }),
+                });
+                const data = await res.json();
+
+                if (!res.ok || data.status !== 'deleted') {
+                    throw new Error(data.error || 'Unable to delete task');
+                }
+
+                if (statusEl) statusEl.textContent = 'Deleted';
+                setTimeout(() => window.location.reload(), 300);
+            } catch (err) {
+                console.error(err);
+                if (statusEl) statusEl.textContent = `Error: ${err.message}`;
+            } finally {
+                button.disabled = false;
+            }
+        });
+    });
+
     // === Calendar Redirect (per-task buttons) ===
     document.querySelectorAll('.btn-calendar-icon').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -129,8 +252,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await res.json();
 
                 if (res.ok && data.status === 'success') {
-                    statusEl.textContent = `✅ Synced ${data.synced_count} tasks to Notion`;
-                    statusEl.className = 'sync-status success';
+                    setNotionSuccessStatus(statusEl, data.synced_count, data.dashboard_url);
                 } else {
                     // Fallback
                     if (data.clipboard_markdown) {

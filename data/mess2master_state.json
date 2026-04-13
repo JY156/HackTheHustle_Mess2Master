@@ -227,6 +227,25 @@
       "cross_insights": [
         "Fallback parsing used transcript-only extraction due to model unavailability"
       ]
+    },
+    {
+      "project_name": "API Documentation",
+      "pending_tasks": [
+        {
+          "id": "ts_1776050519_9403",
+          "title": "Finish API docs",
+          "description": "Need to finish API docs by Friday 5pm",
+          "deadline": "2026-04-17 17:00",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Unassigned",
+          "follow_up": null
+        }
+      ],
+      "completed_tasks": [],
+      "gaps": [],
+      "sync_score": 75,
+      "cross_insights": []
     }
   ]
 }

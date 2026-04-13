@@ -81,6 +81,56 @@ def merge_tasks(existing, new_tasks):
             existing.append(new)
     return existing
 
+def find_task(data, project_name, task_id):
+    project = next((p for p in data.get("projects", []) if p.get("project_name") == project_name), None)
+    if not project:
+        return None, None
+    for bucket_name in ("pending_tasks", "completed_tasks"):
+        for task in project.get(bucket_name, []):
+            if task.get("id") == task_id:
+                return project, task
+    return project, None
+
+
+def notion_dashboard_url():
+    direct = (os.getenv("NOTION_DATABASE_URL") or "").strip()
+    if direct:
+        return direct
+    db_id = (os.getenv("NOTION_DATABASE_ID") or "").replace("-", "").strip()
+    return f"https://www.notion.so/{db_id}" if db_id else None
+
+
+def build_display_gaps(project):
+    """Combine AI gaps with deterministic task hygiene risks for UI display."""
+    base_gaps = list(project.get("gaps") or [])
+    pending_tasks = project.get("pending_tasks") or []
+
+    unassigned_count = 0
+    missing_deadline_count = 0
+    for task in pending_tasks:
+        owner = str(task.get("owner") or "").strip().lower()
+        deadline = str(task.get("deadline") or task.get("due_date") or "").strip()
+        if not owner or owner == "unassigned":
+            unassigned_count += 1
+        if not deadline:
+            missing_deadline_count += 1
+
+    if unassigned_count:
+        label = "task" if unassigned_count == 1 else "tasks"
+        base_gaps.append({
+            "issue": f"{unassigned_count} pending {label} without assignee",
+            "suggestion": "Assign each task to a specific teammate to avoid ownership gaps.",
+        })
+
+    if missing_deadline_count:
+        label = "task" if missing_deadline_count == 1 else "tasks"
+        base_gaps.append({
+            "issue": f"{missing_deadline_count} pending {label} without deadline",
+            "suggestion": "Set a clear due date so priorities and reminders stay reliable.",
+        })
+
+    return base_gaps
+
 # === Routes ===
 
 @app.route("/")
@@ -88,6 +138,8 @@ def index():
     """Upload page + project selection"""
     data = load_state()
     projects = data.get("projects", [])
+    for project in projects:
+        project["display_gaps"] = build_display_gaps(project)
     project_names = [p.get("project_name") for p in projects]
     semester = data.get("semester", {})
     
@@ -112,6 +164,8 @@ def tasks_page():
     """Task board view with project tabs"""
     data = load_state()
     projects = data.get("projects", [])
+    for project in projects:
+        project["display_gaps"] = build_display_gaps(project)
     
     # Build master queue (null-safe sort)
     all_pending = []
@@ -194,6 +248,8 @@ def process_upload():
             project["gaps"] = result.get("gaps", [])
             project["sync_score"] = result.get("sync_score", 75)
             project["cross_insights"] = result.get("cross_insights", [])
+            # Keep most recently updated project at the end for homepage "recent" rendering.
+            data["projects"] = [p for p in data["projects"] if p.get("project_name") != project_name] + [project]
         else:
             data["projects"].append({
                 "project_name": project_name,
@@ -259,6 +315,70 @@ def complete_task():
     
     return jsonify({"error": "Task not found"}), 404
 
+@app.route("/api/tasks/update", methods=["POST"])
+def update_task():
+    """Update editable task fields while preserving stored task identity."""
+    data = load_state()
+    req = request.json or {}
+    project_name = req.get("project_name")
+    task_id = req.get("task_id")
+
+    if not project_name or not task_id:
+        return jsonify({"error": "project_name and task_id are required"}), 400
+
+    project, task = find_task(data, project_name, task_id)
+    if not project or not task:
+        return jsonify({"error": "Task not found"}), 404
+
+    updates = {
+        "title": (req.get("title") or task.get("title") or task.get("task") or "").strip(),
+        "deadline": (req.get("deadline") or "").strip() or None,
+        "owner": (req.get("owner") or "").strip() or None,
+        "priority": (req.get("priority") or task.get("priority") or "medium").strip().lower(),
+    }
+
+    if updates["priority"] not in {"high", "medium", "low"}:
+        updates["priority"] = "medium"
+
+    task.update(updates)
+    task["status"] = task.get("status") or "pending"
+
+    save_state(data)
+    return jsonify({
+        "status": "success",
+        "task": task,
+        "project_name": project_name,
+    })
+
+@app.route("/api/tasks/delete", methods=["POST"])
+def delete_task():
+    """Delete a task from pending or completed buckets."""
+    data = load_state()
+    req = request.json or {}
+    project_name = req.get("project_name")
+    task_id = req.get("task_id")
+
+    if not project_name or not task_id:
+        return jsonify({"error": "project_name and task_id are required"}), 400
+
+    project = next((p for p in data.get("projects", []) if p.get("project_name") == project_name), None)
+    if not project:
+        return jsonify({"error": "Project not found"}), 404
+
+    removed = False
+    for bucket_name in ("pending_tasks", "completed_tasks"):
+        bucket = project.get(bucket_name, [])
+        new_bucket = [t for t in bucket if t.get("id") != task_id]
+        if len(new_bucket) != len(bucket):
+            project[bucket_name] = new_bucket
+            removed = True
+
+    if not removed:
+        return jsonify({"error": "Task not found"}), 404
+
+    save_state(data)
+    return jsonify({"status": "deleted", "project_name": project_name, "task_id": task_id})
+
 @app.route("/sync-notion", methods=["POST"])
 def sync_notion():
     """Sync tasks to Notion. Always returns JSON, even on crashes."""
@@ -315,7 +435,8 @@ def sync_notion():
                 "status": "success", 
                 "synced_count": synced_count, 
                 "total_tasks": len([t for p in projects_to_sync for t in p.get("pending_tasks", [])]),
-                "errors": errors
+                "errors": errors,
+                "dashboard_url": notion_dashboard_url(),
             })
         else:
             # Graceful fallback to clipboard
