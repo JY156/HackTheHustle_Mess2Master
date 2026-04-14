@@ -313,7 +313,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         formData.set('project_name', projectName); // ✅ Force correct value
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 45000);
+        const timeoutId = setTimeout(() => controller.abort(), 120000);
 
         try {
             const res = await fetch('/process', { method: 'POST', body: formData, signal: controller.signal });
