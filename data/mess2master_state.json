@@ -639,84 +639,7 @@
     },
     {
       "project_name": "API Documentation",
-      "pending_tasks": [
-        {
-          "id": "ts_1776050519_9403",
-          "title": "Finish API docs",
-          "description": "Need to finish API docs by Friday 5pm",
-          "deadline": "2026-04-17 17:00",
-          "priority": "high",
-          "status": "pending",
-          "owner": "Unassigned",
-          "follow_up": null
-        },
-        {
-          "id": "ts_1776129092_0",
-          "title": "start on Week 4 (30/3/2026) onwards Every week every group...",
-          "description": "start on Week 4 (30/3/2026) onwards Every week every group will present the lab for the particular week and demonstrate a working code that",
-          "deadline": null,
-          "due_date_source": "null",
-          "priority": "medium",
-          "status": "pending",
-          "owner": "Session",
-          "follow_up": null
-        },
-        {
-          "id": "ts_1776129092_1",
-          "title": "consist of Algorithm introduction (limit this to 1-3 slide...",
-          "description": "consist of Algorithm introduction (limit this to 1-3 slide only) Flow-chart & Pseudo-code of your coding",
-          "deadline": null,
-          "due_date_source": "null",
-          "priority": "medium",
-          "status": "pending",
-          "owner": "Presentation",
-          "follow_up": null
-        },
-        {
-          "id": "ts_1776129092_2",
-          "title": "comment your coding extensively Do not plagiarize work...",
-          "description": "comment your coding extensively Do not plagiarize work blatantly, work smart Rotate presenter Wednesday 11am-1pm MM3 Lab-Schedule- OCC3 Week 4 - 01/04/2026 - Physical - Presentation Lab1 Week 5 - 8/4/2026 - Offline submission (submit report + recorded presentation+ slides in Spectrum) Presentation - Lab2 Week 6 - 15/4/2026 - Online - Presentation Lab3 Week 7 - 22/4/2026 - Online - Presentation Lab4 Week 8 - 6/5/2026 - Physical - Presentation Lab5 Week 9 - 13/5/2026 - Physical - Presentation Lab6 Week 10 - 20/5/2026 - Online - Presentation Lab7 Week 11 - 27/5/2026 - Offline submission (submit report + recorded presentation+ slides in Spectrum) - Lab8 Gentle reminder",
-          "deadline": null,
-          "due_date_source": "null",
-          "priority": "medium",
-          "status": "pending",
-          "owner": "Tips",
-          "follow_up": null
-        },
-        {
-          "id": "ts_1776129092_3",
-          "title": "Start our lab presentation on Week 4 ( Wednesday, 1st April)",
-          "description": "start our lab presentation on Week 4 ( Wednesday, 1st April)",
-          "deadline": null,
-          "due_date_source": "null",
-          "priority": "medium",
-          "status": "pending",
-          "owner": null,
-          "follow_up": "Assign owner"
-        },
-        {
-          "id": "ts_1776129092_4",
-          "title": "Be able to input any numbers to deliver the output",
-          "description": "be able to input any numbers to deliver the output",
-          "deadline": null,
-          "due_date_source": "null",
-          "priority": "medium",
-          "status": "pending",
-          "owner": "Program",
-          "follow_up": null
-        },
-        {
-          "id": "ts_1776129092_5",
-          "title": "Have 15 mins to present",
-          "description": "have 15 mins to present",
-          "deadline": null,
-          "due_date_source": "null",
-          "priority": "medium",
-          "status": "pending",
-          "owner": "Group",
-          "follow_up": null
-        }
-      ],
+      "pending_tasks": [],
       "completed_tasks": [],
       "gaps": [
         {
@@ -730,6 +653,171 @@
       ],
       "sync_score": 70,
       "cross_insights": []
+    },
+    {
+      "project_name": "Web Programming",
+      "pending_tasks": [
+        {
+          "id": "ts_1776155104_14",
+          "title": "Accept any numbers to deliver output",
+          "description": "accept any numbers to deliver output",
+          "deadline": "2026-04-01",
+          "due_date_source": "explicit",
+          "priority": "medium",
+          "status": "pending",
+          "owner": null,
+          "follow_up": "Assign owner"
+        },
+        {
+          "id": "ts_1776155104_13",
+          "title": "NOT be hard-coded",
+          "description": "NOT be hard-coded",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": null,
+          "follow_up": "Assign owner"
+        },
+        {
+          "id": "ts_1776155104_7",
+          "title": "Write the Phase 1 report",
+          "description": "write the Phase 1 report",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": null,
+          "follow_up": "Assign owner"
+        },
+        {
+          "id": "ts_1710153600",
+          "title": "Initialize GitHub Repo and Invite Members",
+          "description": "Initialize the GitHub repository for the WIF2003 project and invite all 6 team members. Use the template from last semester's project.",
+          "deadline": "2026-03-22",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": "SY",
+          "follow_up": "Assign owner"
+        },
+        {
+          "id": "ts_1776155104_3",
+          "title": "UI wireframes for login + user dashboard",
+          "description": "UI wireframes for login + user dashboard",
+          "deadline": "2026-04-10",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Mike",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776155104_8",
+          "title": "Prepare the presentation slides",
+          "description": "prepare the presentation slides",
+          "deadline": "2026-04-30",
+          "due_date_source": "explicit",
+          "priority": "medium",
+          "status": "pending",
+          "owner": null,
+          "follow_up": "Assign owner"
+        },
+        {
+          "id": "ts_1776155104_9",
+          "title": "Draft the report sections 1-2 (tech stack + Bootstrap",
+          "description": "draft the report sections 1-2 (tech stack + Bootstrap components)",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "JX",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776155104_10",
+          "title": "Need screenshots of the UI",
+          "description": "need screenshots of the UI",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "JX",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776155104_5",
+          "title": "Design the database schema",
+          "description": "design the database schema",
+          "deadline": "2026-04-15",
+          "due_date_source": "explicit",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "John",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776155104_4",
+          "title": "Need the design system specs",
+          "description": "need the design system specs",
+          "deadline": "2026-04-17",
+          "due_date_source": "suggested",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Mike",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776155104_6",
+          "title": "Take the authentication API endpoints (register, login,",
+          "description": "take the authentication API endpoints (register, login, session)",
+          "deadline": "2026-04-17",
+          "due_date_source": "explicit",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Alex",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776155104_2",
+          "title": "Pick the title and update the README",
+          "description": "pick the title and update the README",
+          "deadline": "2026-04-20",
+          "due_date_source": "suggested",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Mike",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776155104_11",
+          "title": "Take the presentation slides if someone gives me the key",
+          "description": "take the presentation slides if someone gives me the key milestones",
+          "deadline": "2026-04-25",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": "SY",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776155104_12",
+          "title": "Submit peer evaluation forms",
+          "description": "Submit peer evaluation forms",
+          "deadline": "2026-04-30",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": "All Members",
+          "follow_up": null
+        }
+      ],
+      "completed_tasks": [],
+      "gaps": [],
+      "sync_score": 80,
+      "cross_insights": [
+        "The existing task 'Set it up today' seems to be related to the GitHub setup mentioned in the notes. It's unclear if it's a duplicate or a precursor. Assuming it's a general setup task for now."
+      ]
     }
   ]
 }

@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify, render_template, redirect
 from dotenv import load_dotenv
 import os, json, time, threading
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from gemini_client import Mess2MasterAI
 from notion_client import NotionClient  # Optional: wrapped in try/except
 
@@ -70,6 +70,73 @@ def priority_score(priority):
     return {"high": 3, "medium": 2, "low": 1}.get(priority, 1)
 
 
+def is_low_signal_title(title: str) -> bool:
+    text = str(title or "").strip().lower()
+    if not text:
+        return True
+    bad_exact = {
+        "it", "this", "that", "those", "these", "to", "the",
+        "set it up today", "draft those", "work", "deadline", "member"
+    }
+    if text in bad_exact:
+        return True
+    if re.fullmatch(r"(?:do|take|handle|draft)\s+(?:it|this|that|those|these)", text):
+        return True
+    return False
+
+
+def normalize_task(task):
+    t = dict(task or {})
+    t["title"] = str(t.get("title") or t.get("task") or "").strip()
+    t["description"] = str(t.get("description") or "").strip()
+    t["owner"] = str(t.get("owner") or "").strip() or None
+    t["deadline"] = str(t.get("deadline") or t.get("due_date") or "").strip() or None
+    t["priority"] = str(t.get("priority") or "medium").strip().lower()
+    if t["priority"] not in {"high", "medium", "low"}:
+        t["priority"] = "medium"
+    t["status"] = "pending"
+    return t
+
+
+def task_risk_score(task):
+    score = priority_score(task.get("priority")) * 10
+    owner = str(task.get("owner") or "").strip().lower()
+    deadline_raw = str(task.get("deadline") or task.get("due_date") or "").strip()
+    unassigned = (not owner) or owner == "unassigned"
+    if unassigned:
+        score += 28
+    if not deadline_raw:
+        score += 22
+    else:
+        deadline_dt = parse_deadline_for_alert(task)
+        if deadline_dt:
+            delta_hours = (deadline_dt - datetime.now()).total_seconds() / 3600.0
+            if delta_hours < 0:
+                score += 35
+            elif delta_hours <= 72:
+                score += 20
+            elif delta_hours <= 168:
+                score += 10
+    return score
+
+
+def sort_pending_tasks(tasks):
+    cleaned = []
+    seen = set()
+    for task in tasks or []:
+        t = normalize_task(task)
+        if is_low_signal_title(t.get("title")):
+            continue
+        sig = task_signature(t)
+        if sig in seen:
+            continue
+        seen.add(sig)
+        cleaned.append(t)
+
+    cleaned.sort(key=lambda x: (-task_risk_score(x), safe_deadline(x), (x.get("title") or "").lower()))
+    return cleaned
+
+
 def task_signature(task):
     """Build a stable semantic key for deduping equivalent tasks across reprocessing."""
     title = str(task.get("title") or task.get("task") or "").strip().lower()
@@ -81,6 +148,8 @@ def task_signature(task):
 # === Helper: Merge Tasks by ID ===
 def merge_tasks(existing, new_tasks):
     """Merge new tasks into existing, preserving IDs and avoiding duplicates"""
+    existing = [normalize_task(t) for t in (existing or []) if not is_low_signal_title((t or {}).get("title") or (t or {}).get("task"))]
+    new_tasks = [normalize_task(t) for t in (new_tasks or []) if not is_low_signal_title((t or {}).get("title") or (t or {}).get("task"))]
     existing_map = {t.get("id"): t for t in existing if t.get("id")}
     signature_map = {task_signature(t): t for t in existing if (t.get("title") or t.get("task"))}
     
@@ -106,7 +175,7 @@ def merge_tasks(existing, new_tasks):
             existing.append(new)
             existing_map[new["id"]] = new
             signature_map[task_signature(new)] = new
-    return existing
+    return sort_pending_tasks(existing)
 
 def find_task(data, project_name, task_id):
     project = next((p for p in data.get("projects", []) if p.get("project_name") == project_name), None)
@@ -152,32 +221,78 @@ def notion_dashboard_url():
 
 
 def build_display_gaps(project):
-    """Combine AI gaps with deterministic task hygiene risks for UI display."""
-    base_gaps = list(project.get("gaps") or [])
+    """Combine AI gaps with detailed, actionable task hygiene risks for UI display."""
+    base_gaps = []
+    for gap in list(project.get("gaps") or []):
+        issue_text = str((gap or {}).get("issue") or "")
+        # Remove generic aggregate messages; replace with task-specific risks below.
+        if re.search(r"\bpending\s+tasks?\s+without\s+(?:assignee|deadline)\b", issue_text, flags=re.IGNORECASE):
+            continue
+        if re.search(r"some tasks may still miss clear assignees or due dates", issue_text, flags=re.IGNORECASE):
+            continue
+        base_gaps.append(gap)
+
     pending_tasks = project.get("pending_tasks") or []
 
-    unassigned_count = 0
-    missing_deadline_count = 0
+    def parse_date(raw):
+        text = str(raw or "").strip()
+        if not text:
+            return None
+        for fmt in ("%Y-%m-%d", "%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M"):
+            try:
+                return datetime.strptime(text, fmt)
+            except ValueError:
+                continue
+        return None
+
+    def assignment_due_hint(deadline_text):
+        dt = parse_date(deadline_text)
+        if not dt:
+            return "before the next team sync"
+        target = (dt - timedelta(days=5)).date()
+        return target.isoformat()
+
     for task in pending_tasks:
+        title = str(task.get("title") or task.get("task") or "Untitled task").strip()
         owner = str(task.get("owner") or "").strip().lower()
         deadline = str(task.get("deadline") or task.get("due_date") or "").strip()
-        if not owner or owner == "unassigned":
-            unassigned_count += 1
+        if (not owner) or owner == "unassigned":
+            due_hint = assignment_due_hint(deadline)
+            base_gaps.append({
+                "issue": f"No owner assigned for \"{title}\"",
+                "suggestion": f"Assign a team member to own this by {due_hint}."
+            })
         if not deadline:
-            missing_deadline_count += 1
+            base_gaps.append({
+                "issue": f"No deadline set for \"{title}\"",
+                "suggestion": "Set a concrete due date so sequencing and reminders stay reliable."
+            })
 
-    if unassigned_count:
-        label = "task" if unassigned_count == 1 else "tasks"
+    # Add transcript-contextual practical risks when task titles suggest unresolved decisions.
+    normalized_text = " ".join(
+        [
+            str((gap or {}).get("issue") or "") + " " + str((gap or {}).get("suggestion") or "")
+            for gap in (project.get("gaps") or [])
+        ] + [
+            str(t.get("title") or "") + " " + str(t.get("description") or "")
+            for t in pending_tasks
+        ]
+    ).lower()
+
+    if ("tech stack" in normalized_text or "bootstrap" in normalized_text or "custom css" in normalized_text) and (
+        "unclear" in normalized_text or "undecided" in normalized_text or "not assigned" in normalized_text or "confirm" in normalized_text
+    ):
         base_gaps.append({
-            "issue": f"{unassigned_count} pending {label} without assignee",
-            "suggestion": "Assign each task to a specific teammate to avoid ownership gaps.",
+            "issue": "Tech stack decision (Bootstrap 5 vs custom CSS) still unclear",
+            "suggestion": "Schedule a 15-min sync before Friday to confirm and document the decision."
         })
 
-    if missing_deadline_count:
-        label = "task" if missing_deadline_count == 1 else "tasks"
+    if ("week 8 break" in normalized_text or "may 6-12" in normalized_text or "may 6" in normalized_text) and (
+        "impact" in normalized_text or "shift" in normalized_text or "timeline" in normalized_text or "deadline" in normalized_text
+    ):
         base_gaps.append({
-            "issue": f"{missing_deadline_count} pending {label} without deadline",
-            "suggestion": "Set a clear due date so priorities and reminders stay reliable.",
+            "issue": "Week 8 break (May 6-12) may impact Phase 2 timeline",
+            "suggestion": "Confirm with the lecturer whether backend deadlines shift after the break."
         })
 
     deduped = []
@@ -325,6 +440,7 @@ def index():
     data = load_state()
     projects = data.get("projects", [])
     for project in projects:
+        project["pending_tasks"] = sort_pending_tasks(project.get("pending_tasks") or [])
         project["display_gaps"] = build_display_gaps(project)
         project["alerts"] = build_project_alerts(project)
         project["alert_count"] = len(project["alerts"])
@@ -344,7 +460,7 @@ def index():
             t_copy["score"] = priority_score(t_copy.get("priority"))
             t_copy["needs_alert"] = str(t_copy.get("id") or "") in set(p.get("alert_task_ids") or [])
             master_tasks.append(t_copy)
-    master_tasks.sort(key=lambda x: (-x["score"], safe_deadline(x)))
+    master_tasks.sort(key=lambda x: (-task_risk_score(x), -x["score"], safe_deadline(x)))
     
     return render_template("index.html",
                          project_names=project_names,
@@ -360,6 +476,7 @@ def tasks_page():
     data = load_state()
     projects = data.get("projects", [])
     for project in projects:
+        project["pending_tasks"] = sort_pending_tasks(project.get("pending_tasks") or [])
         project["display_gaps"] = build_display_gaps(project)
         project["alerts"] = build_project_alerts(project)
         project["alert_count"] = len(project["alerts"])
@@ -378,7 +495,7 @@ def tasks_page():
             t_copy["score"] = priority_score(t_copy.get("priority"))
             t_copy["needs_alert"] = str(t_copy.get("id") or "") in alert_ids
             all_pending.append(t_copy)
-    all_pending.sort(key=lambda x: (-x["score"], safe_deadline(x)))
+    all_pending.sort(key=lambda x: (-task_risk_score(x), -x["score"], safe_deadline(x)))
     
     return render_template("tasks.html", 
                          projects=projects, 
@@ -445,7 +562,7 @@ def process_upload():
         
         # Merge logic
         new_tasks = result.get("tasks", [])
-        merged_tasks = merge_tasks(existing_pending, new_tasks)
+        merged_tasks = sort_pending_tasks(merge_tasks(existing_pending, new_tasks))
         
         # Update or create project
         if project:

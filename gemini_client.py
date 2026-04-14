@@ -2,6 +2,9 @@ import os
 import json
 import time
 import re
+import mimetypes
+import hashlib
+import google.auth
 from datetime import date, timedelta, datetime, timezone
 from io import BytesIO
 from PyPDF2 import PdfReader
@@ -11,22 +14,112 @@ from google.genai import types
 
 QUOTA_STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "gemini_quota_state.json")
 
+
 class Mess2MasterAI:
     def __init__(self):
-        api_key = os.getenv("GEMINI_API_KEY")
+        api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
         if not api_key:
-            raise ValueError("GEMINI_API_KEY not found. Check your .env file.")
-        self.client = genai.Client(api_key=api_key)
-        
-        # ✅ Model fallback chain (Main's robustness)
+            raise ValueError("GEMINI_API_KEY/GOOGLE_API_KEY not found. Check your .env file.")
+        self.api_key_fingerprint = hashlib.sha256(api_key.encode("utf-8")).hexdigest()[:16]
+
+        self.vertex_project = (
+            os.getenv("GEMINI_PROJECT_ID")
+            or os.getenv("GOOGLE_CLOUD_PROJECT")
+            or os.getenv("GCP_PROJECT")
+        )
+        if isinstance(self.vertex_project, str) and self.vertex_project.startswith("projects/"):
+            self.vertex_project = self.vertex_project.split("/", 1)[1]
+        self.vertex_location = os.getenv("GEMINI_LOCATION", "us-central1")
+        use_vertex_env = str(os.getenv("GEMINI_USE_VERTEX", "")).strip().lower()
+        self.use_vertex = use_vertex_env in {"1", "true", "yes", "on"} if use_vertex_env else bool(self.vertex_project)
+
+        if self.use_vertex and self.vertex_project:
+            adc_ok = True
+            try:
+                google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+            except Exception as adc_error:
+                adc_ok = False
+                print(
+                    "⚠️ Vertex mode requested but Application Default Credentials (ADC) were not found "
+                    f"({adc_error}). Falling back to API-key Developer endpoint."
+                )
+
+            if adc_ok:
+                try:
+                    # Vertex mode uses Cloud auth (ADC/service account), not API key.
+                    self.client = genai.Client(
+                        vertexai=True,
+                        project=self.vertex_project,
+                        location=self.vertex_location,
+                    )
+                except Exception as init_error:
+                    print(f"⚠️ Vertex client init failed ({init_error}). Falling back to API-key Developer endpoint.")
+                    self.use_vertex = False
+                    self.client = genai.Client(api_key=api_key)
+            else:
+                self.use_vertex = False
+                self.client = genai.Client(api_key=api_key)
+        else:
+            if self.use_vertex and not self.vertex_project:
+                print("⚠️ GEMINI_USE_VERTEX is enabled but no project ID was found. Falling back to Developer endpoint.")
+            self.client = genai.Client(api_key=api_key)
+
+        # Model fallback chain for endpoint-specific name differences.
         self.model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
-        self.model_fallbacks = [
-            self.model,
+        self.model_fallbacks = self._build_model_fallbacks(self.model)
+
+    def _build_model_fallbacks(self, preferred_model: str) -> list:
+        if self.use_vertex and self.vertex_project:
+            return [
+                preferred_model,
+                "gemini-2.5-flash-lite-001",
+                "gemini-2.5-flash-001",
+                "gemini-2.0-flash-001",
+                "gemini-1.5-flash-001",
+            ]
+
+        return [
+            preferred_model,
             "gemini-2.5-flash-lite",
             "models/gemini-2.5-flash-lite",
             "gemini-2.5-flash",
             "models/gemini-2.5-flash",
+            "gemini-2.0-flash",
+            "models/gemini-2.0-flash",
         ]
+
+    def _resolve_mime(self, filename: str, provided_mime: str | None) -> str:
+        ext = filename.rsplit('.', 1)[-1].lower() if "." in filename else ""
+        mapped = {
+            "pdf": "application/pdf",
+            "doc": "application/msword",
+            "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "txt": "text/plain",
+            "md": "text/plain",
+            "csv": "text/plain",
+            "json": "text/plain",
+            "mp3": "audio/mpeg",
+            "wav": "audio/wav",
+            "m4a": "audio/mp4",
+            "ogg": "audio/ogg",
+            "png": "image/png",
+            "jpg": "image/jpeg",
+            "jpeg": "image/jpeg",
+            "webp": "image/webp",
+        }
+
+        candidate = (provided_mime or "").strip().lower()
+        if candidate and candidate != "application/octet-stream":
+            return candidate
+
+        if ext in mapped:
+            return mapped[ext]
+
+        guessed, _ = mimetypes.guess_type(filename)
+        if guessed and guessed != "application/octet-stream":
+            return guessed
+
+        return "application/octet-stream"
 
     def _load_quota_state(self):
         try:
@@ -49,6 +142,16 @@ class Mess2MasterAI:
 
     def _quota_cooldown_active(self):
         state = self._load_quota_state()
+        if state.get("api_key_fingerprint") and state.get("api_key_fingerprint") != self.api_key_fingerprint:
+            return False, state
+        if state.get("endpoint_mode"):
+            current_mode = "vertex" if (self.use_vertex and self.vertex_project) else "developer"
+            if state.get("endpoint_mode") != current_mode:
+                return False, state
+        # Ignore stale cooldowns from models outside current fallback set.
+        state_model = str(state.get("model") or "").strip()
+        if state_model and state_model not in set(self.model_fallbacks):
+            return False, state
         until = float(state.get("cooldown_until", 0) or 0)
         if until and time.time() < until:
             return True, state
@@ -90,8 +193,14 @@ class Mess2MasterAI:
             "cooldown_until": cooldown_until,
             "model": model_name,
             "reason": error_text[:1000],
+            "api_key_fingerprint": self.api_key_fingerprint,
+            "endpoint_mode": "vertex" if (self.use_vertex and self.vertex_project) else "developer",
             "updated_at": time.time(),
         })
+
+    def _is_hard_quota_lock(self, error_text: str) -> bool:
+        low = (error_text or "").lower()
+        return "spending cap" in low or "monthly spending cap" in low
 
     def _quota_fallback_result(self, reason: str):
         return {
@@ -110,15 +219,51 @@ class Mess2MasterAI:
         invalid = {
             "someone", "somebody", "anyone", "anybody", "everyone", "team",
             "could", "can", "will", "should", "must", "also", "then", "next",
-            "i", "im", "i'm", "me", "we", "us", "you", "unassigned", "none", "null"
+            "i", "im", "i'm", "me", "we", "us", "you", "unassigned", "none", "null",
+            "to", "the", "it", "this", "that", "those", "these",
+            "member", "members", "deadline", "work", "task", "tasks"
         }
         if lower in invalid:
             return None
+
+        if re.fullmatch(r"[A-Z]{2,4}", raw):
+            return raw
+
+        if re.fullmatch(r"all\s+members", lower):
+            return "All Members"
 
         if re.fullmatch(r"[a-zA-Z][a-zA-Z\-']{1,30}", raw):
             return raw.capitalize()
 
         return raw
+
+    def _canonical_task_title(self, text: str) -> str:
+        tokens = re.findall(r"[a-z0-9]+", (text or "").lower())
+        drop = {"the", "a", "an", "all", "please"}
+        filtered = [t for t in tokens if t not in drop and not t.isdigit()]
+        return " ".join(filtered)
+
+    def _is_low_signal_task(self, title: str, description: str = "") -> bool:
+        t = (title or "").strip().lower()
+        d = (description or "").strip().lower()
+        if not t:
+            return True
+
+        low_title_exact = {
+            "it", "this", "that", "those", "these", "to", "the", "draft those",
+            "do that", "do this", "handle that", "take that",
+        }
+        if t in low_title_exact:
+            return True
+
+        if t.startswith("work -") or t in {"work", "deadline", "member", "members"}:
+            return True
+
+        # Very short generic fragments are usually transcript noise.
+        if len(re.findall(r"[a-z0-9]+", t)) <= 2 and t in {"system specs", "specs", "title", "report"} and len(d) < 28:
+            return True
+
+        return False
 
     def generate_task_guidance(self, task: dict):
         """Generate concise, actionable execution guidance for a single task."""
@@ -248,6 +393,7 @@ class Mess2MasterAI:
             "used_model": None,
             "fallback": False,
             "fallback_reason": None,
+            "endpoint": "vertex" if (self.use_vertex and self.vertex_project) else "developer",
         }
 
         quota_active, quota_state = self._quota_cooldown_active()
@@ -256,21 +402,13 @@ class Mess2MasterAI:
             diagnostics["fallback_reason"] = quota_state.get("reason") or "Gemini quota cooldown active"
             return self._fallback(sem_start, notes=notes, reason=diagnostics["fallback_reason"], diagnostics=diagnostics)
         
-        mime_map = {
-            'pdf': 'application/pdf', 'doc': 'application/msword',
-            'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'txt': 'text/plain', 'mp3': 'audio/mpeg', 'wav': 'audio/wav',
-            'm4a': 'audio/mp4', 'ogg': 'audio/ogg', 'png': 'image/png',
-            'jpg': 'image/jpeg', 'jpeg': 'image/jpeg'
-        }
-
         # === File Processing: PDF Text Extraction + Multimodal Fallback ===
         for file in files:
             try:
                 filename = getattr(file, "filename", "") or ""
                 ext = filename.rsplit('.', 1)[-1].lower() if "." in filename else ""
-                mime = getattr(file, "mimetype", None) or mime_map.get(ext, 'application/octet-stream')
                 file_bytes = file.read()
+                mime = self._resolve_mime(filename, getattr(file, "mimetype", None))
                 is_pdf = (ext == 'pdf') or (mime == 'application/pdf')
 
                 # Special handling for PDFs: extract text first (better for task extraction)
@@ -298,6 +436,18 @@ class Mess2MasterAI:
                 # Truncate large non-PDF files to avoid token limits
                 if not is_pdf and len(file_bytes) > 2_000_000:
                     file_bytes = file_bytes[:2_000_000]
+
+                if mime == "application/octet-stream":
+                    # Gemini rejects octet-stream; best effort text fallback for unknown files.
+                    try:
+                        text_fallback = file_bytes.decode("utf-8", errors="ignore").strip()
+                        if text_fallback:
+                            contents.append(f"FILE: {filename}\nTYPE: text\nEXTRACTED_TEXT:\n{text_fallback[:12000]}")
+                            continue
+                    except Exception:
+                        pass
+                    print(f"⚠️ Skipping file {filename}: unsupported MIME type application/octet-stream")
+                    continue
 
                 contents.append(types.Part.from_bytes(data=file_bytes, mime_type=mime))
             except Exception as e:
@@ -408,11 +558,14 @@ class Mess2MasterAI:
                 error_text = str(e)
                 print(f"❌ AI Error with {model_name}: {error_text}")
                 
-                # Stop on quota errors (don't waste retries)
-                if "429" in error_text or "RESOURCE_EXHAUSTED" in error_text or "spending cap" in error_text.lower():
+                # Hard lock (spending cap) should stop retries immediately.
+                if self._is_hard_quota_lock(error_text):
                     self._register_quota_cooldown(error_text, model_name)
                     diagnostics["used_model"] = model_name
                     return self._fallback(sem_start, notes=notes, reason=error_text, diagnostics=diagnostics)
+                # For model-specific 429/resource limits, continue fallback chain to try other models.
+                if "429" in error_text or "RESOURCE_EXHAUSTED" in error_text:
+                    continue
                 # Continue to next model on 404/not found
                 if "404" in error_text or "NOT_FOUND" in error_text or "no longer available" in error_text:
                     continue
@@ -425,18 +578,19 @@ class Mess2MasterAI:
         """Graceful fallback that still extracts practical tasks from plain transcript text."""
         extracted = self._extract_tasks_from_notes(notes, sem_start)
         if not extracted:
-            ts = int(time.time())
-            extracted = [{
-                "id": f"ts_{ts}",
-                "title": "Review meeting transcript and assign assignees",
-                "description": "AI fallback mode could not parse clear action lines. Confirm assignees and deadlines manually.",
-                "deadline": sem_start,
-                "due_date_source": "suggested",
-                "priority": "high",
-                "status": "pending",
-                "owner": None,
-                "follow_up": "Share one sentence per task: Assignee + Action + Date"
-            }]
+            payload = {
+                "project_name": "Mess2Master",
+                "tasks": [],
+                "gaps": [],
+                "sync_score": 0,
+                "cross_insights": [
+                    "No clear action items were detected. Try explicit phrasing like: 'Alice will finish API docs by Friday.'"
+                ],
+            }
+            payload["_meta"] = diagnostics or {}
+            payload["_meta"]["fallback"] = True
+            payload["_meta"]["fallback_reason"] = reason or "All models failed"
+            return payload
 
         dynamic_gaps = self._build_dynamic_gaps(extracted)
 
@@ -489,11 +643,23 @@ class Mess2MasterAI:
             return []
 
         default_year = self._year_from_sem_start(sem_start)
-        normalized = re.sub(r"\s+", " ", text)
+
+        attendee_set = set()
+        attendees_match = re.search(r"(?i)attendees\s*:\s*([^\n]+)", text)
+        if attendees_match:
+            for raw_name in attendees_match.group(1).split(","):
+                cleaned_name = self._normalize_owner(raw_name.strip())
+                if cleaned_name:
+                    attendee_set.add(cleaned_name.lower())
+
+        normalized = (text or "").replace("\r\n", "\n").replace("\r", "\n")
+        normalized = re.sub(r"\n+", ". ", normalized)
+        normalized = re.sub(r"\s+", " ", normalized)
+        normalized = re.sub(r"\[([^\]]{1,40})\]\s*", r"Speaker \1: ", normalized)
         # Do not split on words like "next" or "also" because they often belong to deadlines/actions.
         normalized = re.sub(r"(?i)\b(wait|first|then|finally|meanwhile|additionally|and also|oh and)\b", r". \1", normalized)
         normalized = re.sub(
-            r"\s+(?=[A-Z][a-z]+(?:,)?\s+(?:will|can|could|should|must|needs?\s+to|has\s+to|can you|please|you'll|you have|you've|you can|we need|we have|take|draft|design|write|prepare|check|confirm|handle|since))",
+            r"\s+(?=(?:[A-Z]{2,4}|[A-Z][a-z]+)(?:,)?\s+(?:will|can|could|should|must|needs?\s+to|has\s+to|can you|please|you'll|you have|you've|you can|we need|we have|take|draft|design|write|prepare|check|confirm|handle|since))",
             ". ",
             normalized,
         )
@@ -501,11 +667,27 @@ class Mess2MasterAI:
         tasks = []
         seen = set()
         last_task = None
+        current_speaker = None
+        recent_context = None
 
         for clause in clauses:
             clause = re.sub(r"^(?:and|also|then|next|finally|meanwhile|additionally|oh and)\b[:\s,.-]*", "", clause, flags=re.IGNORECASE).strip()
             if not clause:
                 continue
+
+            speaker_match = re.match(r"(?i)speaker\s+([^:]{1,40}):\s*(.*)$", clause)
+            if speaker_match:
+                speaker_name = self._normalize_owner(speaker_match.group(1).strip())
+                current_speaker = speaker_name if speaker_name else current_speaker
+                clause = speaker_match.group(2).strip()
+                if not clause:
+                    continue
+
+            topic_match = re.search(r"(?i)(?:first priority|next|final checklist)\s*:\s*(.+)", clause)
+            if topic_match:
+                recent_context = topic_match.group(1).strip(" .")
+            elif re.search(r"(?i)wireframes|database schema|api endpoints|report|presentation slides|github repo|readme|tech stack", clause):
+                recent_context = clause.strip(" .")
 
             owner = None
             action = None
@@ -513,24 +695,38 @@ class Mess2MasterAI:
             due_source = "null"
 
             m_owner = re.search(
-                r"\b(?P<owner>[A-Za-z][a-z]+)(?:,)?\s*(?:since[^,]*,?\s*)?(?:can you|please|you(?:'ll| will)|you've[^,]*,?\s*so please|you have|you can|take|draft|design|write|prepare|check|confirm|handle)\s+(?P<action>.+)",
+                r"\b(?P<owner>(?:[A-Z]{2,4}|[A-Za-z][a-z]+))(?:,)?\s*(?:since[^,]*,?\s*)?(?:can you|please|you(?:'ll| will)|you've[^,]*,?\s*so please|you have|you can|take|draft|design|write|prepare|check|confirm|handle)\s+(?P<action>.+)",
                 clause,
                 flags=re.IGNORECASE,
             )
             if m_owner:
-                owner = m_owner.group("owner")
-                action = m_owner.group("action")
+                candidate_owner = self._normalize_owner(m_owner.group("owner"))
+                if candidate_owner:
+                    owner = candidate_owner
+                    action = m_owner.group("action")
 
             if not action:
                 # Handles natural speech like "Sarah will build...", "Jason could write..."
                 m_owner_simple = re.search(
-                    r"\b(?P<owner>[A-Za-z][a-z]+)\s+(?:will|can|could|should|must|needs?\s+to|has\s+to)\s+(?P<action>.+)",
+                    r"\b(?P<owner>(?!(?:i|we|you)\b)(?:[A-Z]{2,4}|[A-Za-z][a-z]+))\s+(?:will|can|could|should|must|needs?\s+to|has\s+to)\s+(?P<action>.+)",
                     clause,
                     flags=re.IGNORECASE,
                 )
                 if m_owner_simple:
-                    owner = m_owner_simple.group("owner")
-                    action = m_owner_simple.group("action")
+                    candidate_owner = self._normalize_owner(m_owner_simple.group("owner"))
+                    if candidate_owner:
+                        owner = candidate_owner
+                        action = m_owner_simple.group("action")
+
+            if not action:
+                m_first_person = re.search(
+                    r"\b(?:i\s+can|i\s+will|i'll)\s+(?P<action>.+)",
+                    clause,
+                    flags=re.IGNORECASE,
+                )
+                if m_first_person:
+                    owner = current_speaker
+                    action = m_first_person.group("action")
 
             # "Sarah, can you handle that" should assign previous open task owner.
             if action and re.fullmatch(r"(?:handle|take|do)?(?:\s+(?:that|this|it|the same))?[?.!]*", action.strip(), flags=re.IGNORECASE):
@@ -539,6 +735,8 @@ class Mess2MasterAI:
                 continue
 
             owner = self._normalize_owner(owner)
+            if owner and attendee_set and owner.lower() not in attendee_set and owner.lower() != "all members":
+                owner = None
 
             if not action:
                 m_need = re.search(r"\b(?:we need to|we have to|please)\s+(?P<action>.+)", clause, flags=re.IGNORECASE)
@@ -547,6 +745,8 @@ class Mess2MasterAI:
 
             if not action and "peer evaluation" in clause.lower() and "due" in clause.lower():
                 action = "Submit peer evaluation forms"
+                if re.search(r"(?i)each member|all members", clause):
+                    owner = "All Members"
 
             if not action and ("haven't assigned anyone to" in clause.lower() or "not assigned" in clause.lower()):
                 m_gap = re.search(r"(?:haven't assigned anyone to|not assigned to)\s+(?P<action>.+)", clause, flags=re.IGNORECASE)
@@ -567,13 +767,17 @@ class Mess2MasterAI:
             action = re.sub(r"\b(?:by|before|due|deadline)\b.+$", "", action, flags=re.IGNORECASE).strip(" .,")
             action = re.sub(r"\b(?:that|soon|should work)\b$", "", action, flags=re.IGNORECASE).strip(" .,")
             action = re.sub(r"\b(?:i'?m|we should|let'?s|okay that'?s it|that'?s it|but no one'?s assigned.*|wait|also|oh and).*$", "", action, flags=re.IGNORECASE).strip(" .,")
+            if re.fullmatch(r"(?i)(?:draft|handle|take|do)\s+(?:that|this|it|those|these)", action or "") and recent_context:
+                action = recent_context
             if not action:
                 continue
 
             action_variants = self._split_compound_action(action)
             for variant in action_variants:
                 title = self._title_from_action(variant)
-                dedupe_key = (title.lower(), (deadline_iso or ""), (owner or "").lower())
+                if self._is_low_signal_task(title, variant):
+                    continue
+                dedupe_key = (self._canonical_task_title(title), (deadline_iso or ""))
                 if dedupe_key in seen:
                     continue
                 seen.add(dedupe_key)
@@ -613,8 +817,10 @@ class Mess2MasterAI:
         for source in (primary_tasks or [], secondary_tasks or []):
             for task in source:
                 title = self._title_from_action(str(task.get("title") or task.get("description") or ""))
+                if self._is_low_signal_task(title, str(task.get("description") or "")):
+                    continue
                 deadline = task.get("deadline") or task.get("due_date") or ""
-                key = (title.lower(), deadline)
+                key = (self._canonical_task_title(title), deadline)
 
                 normalized = dict(task)
                 normalized["title"] = title
