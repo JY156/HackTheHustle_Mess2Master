@@ -1,4 +1,752 @@
 {
-  "semester": {},
-  "projects": []
+  "semester": {
+    "start": "2026-03-09",
+    "end": "2026-06-21",
+    "break_week": 8
+  },
+  "projects": [
+    {
+      "project_name": "WIF2003 WP",
+      "pending_tasks": [
+        {
+          "id": "ts_1711113600",
+          "title": "Initialize GitHub repo and invite members",
+          "description": "Initialize the GitHub repo and invite all 6 members.",
+          "deadline": "2026-03-22",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": "SY",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1711459200",
+          "title": "Finalize project title and update README",
+          "description": "Finalize the project title from the lecturer's list and update the README with the chosen title.",
+          "deadline": "2026-03-25",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Mike",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1712755200",
+          "title": "Draft UI wireframes for login and user dashboard",
+          "description": "Draft UI wireframes for the login and user dashboard pages.",
+          "deadline": "2026-04-10",
+          "due_date_source": "explicit",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Mike",
+          "follow_up": "Need design system specs (Bootstrap 5 or custom CSS) confirmed."
+        },
+        {
+          "id": "ts_1713273600",
+          "title": "Design database schema",
+          "description": "Design the database schema for the application, considering the user collection schema.",
+          "deadline": "2026-04-15",
+          "due_date_source": "explicit",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "John",
+          "follow_up": "Sync with Alex on Monday morning regarding user collection schema."
+        },
+        {
+          "id": "ts_1713446400",
+          "title": "Build authentication API endpoints",
+          "description": "Build the authentication API endpoints for register, login, and session management.",
+          "deadline": "2026-04-17",
+          "due_date_source": "explicit",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Alex",
+          "follow_up": "Coordinate with John on the user collection schema."
+        },
+        {
+          "id": "ts_1714051200",
+          "title": "Draft Phase 1 report sections 1-2",
+          "description": "Draft report sections 1-2, covering tech stack and Bootstrap components.",
+          "deadline": "2026-04-25",
+          "due_date_source": "explicit",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "JX",
+          "follow_up": "Requires screenshots of the UI first."
+        },
+        {
+          "id": "ts_1714051201",
+          "title": "Prepare presentation slides",
+          "description": "Prepare the presentation slides for the Phase 1 deliverables.",
+          "deadline": "2026-04-25",
+          "due_date_source": "explicit",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "SY",
+          "follow_up": "Need key milestones by April 25th."
+        },
+        {
+          "id": "ts_1714483200",
+          "title": "Compile and proofread Phase 1 report",
+          "description": "Compile and proofread the entire Phase 1 report.",
+          "deadline": "2026-04-30",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": null,
+          "follow_up": null
+        },
+        {
+          "id": "ts_1714483202",
+          "title": "Submit peer evaluation forms",
+          "description": "Each member must submit their peer evaluation forms individually via SPECTRUM.",
+          "deadline": "2026-04-30",
+          "due_date_source": "explicit",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "ALL MEMBERS",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1711977600",
+          "title": "Decide on Tech Stack (Bootstrap vs Custom CSS)",
+          "description": "Decide whether to use Bootstrap 5 or custom CSS for the project.",
+          "deadline": "2026-03-21",
+          "due_date_source": "suggested",
+          "priority": "high",
+          "status": "pending",
+          "owner": null,
+          "follow_up": "Check syllabus before Friday."
+        },
+        {
+          "id": "ts_1714742400",
+          "title": "Ensure program input is not hard-coded",
+          "description": "Ensure that the program input is not hard-coded and can accept any numbers to deliver output for the demo.",
+          "deadline": "2026-05-01",
+          "due_date_source": "suggested",
+          "priority": "medium",
+          "status": "pending",
+          "owner": null,
+          "follow_up": "Relevant for Week 4 presentation demo."
+        },
+        {
+          "id": "ts_1711977601",
+          "title": "Prepare for Week 4 presentation",
+          "description": "Prepare for the 15-minute group presentation scheduled for Week 4.",
+          "deadline": "2026-04-01",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": null,
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776143356_0",
+          "title": "Initialize the GitHub repo and invite all 6 members",
+          "description": "initialize the GitHub repo and invite all 6 members",
+          "deadline": "2026-03-22",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": "SY",
+          "follow_up": "Assign owner"
+        },
+        {
+          "id": "ts_1776143356_1",
+          "title": "It",
+          "description": "it",
+          "deadline": "2026-04-20",
+          "due_date_source": "suggested",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "to",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776143356_2",
+          "title": "Draft those",
+          "description": "draft those",
+          "deadline": "2026-04-10",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Mike",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776143356_3",
+          "title": "System specs",
+          "description": "system specs",
+          "deadline": "2026-04-17",
+          "due_date_source": "suggested",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "the",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776143356_4",
+          "title": "The database schema",
+          "description": "the database schema",
+          "deadline": "2026-04-15",
+          "due_date_source": "explicit",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "can",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776143356_5",
+          "title": "Take the authentication API endpoints (register, login,",
+          "description": "take the authentication API endpoints (register, login, session)",
+          "deadline": "2026-04-17",
+          "due_date_source": "explicit",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Alex",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776143356_6",
+          "title": "The Phase 1 report",
+          "description": "the Phase 1 report",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "to",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776143356_7",
+          "title": "Prepare the presentation slides",
+          "description": "prepare the presentation slides",
+          "deadline": "2026-04-30",
+          "due_date_source": "explicit",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "to",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776143356_8",
+          "title": "The report sections 1-2 (tech stack + Bootstrap components)",
+          "description": "the report sections 1-2 (tech stack + Bootstrap components)",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "can",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776143356_9",
+          "title": "The presentation slides if someone gives me the key milestones",
+          "description": "the presentation slides if someone gives me the key milestones",
+          "deadline": "2026-04-25",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": "can",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776143356_10",
+          "title": "Submit peer evaluation forms",
+          "description": "Submit peer evaluation forms",
+          "deadline": "2026-04-30",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": null,
+          "follow_up": "Assign owner"
+        },
+        {
+          "id": "ts_1776143356_11",
+          "title": "Submit peer evaluation forms",
+          "description": "Submit peer evaluation forms",
+          "deadline": "2026-04-01",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": null,
+          "follow_up": "Assign owner"
+        },
+        {
+          "id": "ts_1776143356_12",
+          "title": "If Phase 2 deadlines shift",
+          "description": "if Phase 2 deadlines shift",
+          "deadline": "2026-05-06",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": "to",
+          "follow_up": null
+        }
+      ],
+      "completed_tasks": [],
+      "gaps": [
+        {
+          "issue": "Project title not officially confirmed.",
+          "suggestion": "Assign someone to confirm the project title from the lecturer's list."
+        },
+        {
+          "issue": "Unclear decision on UI framework (Bootstrap 5 vs custom CSS).",
+          "suggestion": "Check the syllabus and make a decision before Friday."
+        },
+        {
+          "issue": "No owner assigned for compiling and proofreading the Phase 1 report.",
+          "suggestion": "Assign a team member to take ownership of the final report compilation and proofreading."
+        },
+        {
+          "issue": "Potential backend timeline shift due to Week 8 break.",
+          "suggestion": "Confirm if Phase 2 deadlines need to be adjusted considering the break from May 6-12."
+        }
+      ],
+      "cross_insights": [
+        "The Week 4 presentation on April 1st requires several deliverables to be completed by April 25th, indicating a tight schedule leading up to it.",
+        "The unassigned task of compiling and proofreading the Phase 1 report, due April 30th, poses a risk if not addressed promptly.",
+        "The decision on the UI framework (Bootstrap vs. custom CSS) needs to be made early to avoid blocking subsequent tasks like UI wireframing and potentially backend development.",
+        "The Week 8 break (May 6-12) is explicitly mentioned as a potential risk to backend timelines, suggesting a need for proactive planning or buffer time."
+      ]
+    },
+    {
+      "project_name": "WIA2004 OS",
+      "pending_tasks": [
+        {
+          "id": "ts_1776129958_0",
+          "title": "Comment coding extensively, avoid plagiarism, rotate",
+          "description": "comment your coding extensively Do not plagiarize work blatantly, work smart Rotate presenter Wednesday 11am-1pm MM3 Lab-Schedule- OCC3 Week 4 - 01/04/2026 - Physical - Presentation Lab1 Week 5 - 8/4/2026 - Offline submission (submit report + recorded presentation+ slides in Spectrum) Presentation - Lab2 Week 6 - 15/4/2026 - Online - Presentation Lab3 Week 7 - 22/4/2026 - Online - Presentation Lab4 Week 8 - 6/5/2026 - Physical - Presentation Lab5 Week 9 - 13/5/2026 - Physical - Presentation Lab6 Week 10 - 20/5/2026 - Online - Presentation Lab7 Week 11 - 27/5/2026 - Offline submission (submit report + recorded presentation+ slides in Spectrum) - Lab8 Gentle reminder",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Tips",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776129958_1",
+          "title": "Lab presentation starts Week 4",
+          "description": "be inform that we will start our lab presentation on Week 4 ( Wednesday, 1st April)",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": null,
+          "follow_up": "Assign owner"
+        },
+        {
+          "id": "ts_1713023400",
+          "title": "Prepare and present Lab 1",
+          "description": "Present the lab for Week 4 and demonstrate a working code that implements the algorithm. Presentation should include: Algorithm introduction (1-3 slides), Flow-chart & Pseudo-code of coding implementation, Program sample output, Code demonstration. Each group has 15 mins to present. Any absent group members get 0.",
+          "deadline": "2026-04-01",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": null,
+          "follow_up": null
+        },
+        {
+          "id": "ts_1713023401",
+          "title": "Submit Lab 1 materials",
+          "description": "Submit Presentation PowerPoint slide (ppt/pptx/pdf), Lab Report (pdf), and Coding source-code (zipped) in Spectrum.",
+          "deadline": "2026-04-01",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": null,
+          "follow_up": null
+        },
+        {
+          "id": "ts_1713023402",
+          "title": "Prepare and present Lab 2",
+          "description": "Present the lab for Week 5 and demonstrate a working code that implements the algorithm. Presentation should include: Algorithm introduction (1-3 slides), Flow-chart & Pseudo-code of coding implementation, Program sample output, Code demonstration. Each group has 15 mins to present. Any absent group members get 0.",
+          "deadline": "2026-04-08",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": null,
+          "follow_up": null
+        },
+        {
+          "id": "ts_1713023403",
+          "title": "Submit Lab 2 materials",
+          "description": "Submit report, recorded presentation, and slides for Lab 2 in Spectrum.",
+          "deadline": "2026-04-08",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": null,
+          "follow_up": null
+        },
+        {
+          "id": "ts_1713023404",
+          "title": "Prepare and present Lab 3",
+          "description": "Present the lab for Week 6 and demonstrate a working code that implements the algorithm. Presentation should include: Algorithm introduction (1-3 slides), Flow-chart & Pseudo-code of coding implementation, Program sample output, Code demonstration. Each group has 15 mins to present. Any absent group members get 0.",
+          "deadline": "2026-04-15",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": null,
+          "follow_up": null
+        },
+        {
+          "id": "ts_1713023405",
+          "title": "Prepare and present Lab 4",
+          "description": "Present the lab for Week 7 and demonstrate a working code that implements the algorithm. Presentation should include: Algorithm introduction (1-3 slides), Flow-chart & Pseudo-code of coding implementation, Program sample output, Code demonstration. Each group has 15 mins to present. Any absent group members get 0.",
+          "deadline": "2026-04-22",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": null,
+          "follow_up": null
+        },
+        {
+          "id": "ts_1713023406",
+          "title": "Prepare and present Lab 5",
+          "description": "Present the lab for Week 8 and demonstrate a working code that implements the algorithm. Presentation should include: Algorithm introduction (1-3 slides), Flow-chart & Pseudo-code of coding implementation, Program sample output, Code demonstration. Each group has 15 mins to present. Any absent group members get 0.",
+          "deadline": "2026-05-06",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": null,
+          "follow_up": null
+        },
+        {
+          "id": "ts_1713023407",
+          "title": "Prepare and present Lab 6",
+          "description": "Present the lab for Week 9 and demonstrate a working code that implements the algorithm. Presentation should include: Algorithm introduction (1-3 slides), Flow-chart & Pseudo-code of coding implementation, Program sample output, Code demonstration. Each group has 15 mins to present. Any absent group members get 0.",
+          "deadline": "2026-05-13",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": null,
+          "follow_up": null
+        },
+        {
+          "id": "ts_1713023408",
+          "title": "Prepare and present Lab 7",
+          "description": "Present the lab for Week 10 and demonstrate a working code that implements the algorithm. Presentation should include: Algorithm introduction (1-3 slides), Flow-chart & Pseudo-code of coding implementation, Program sample output, Code demonstration. Each group has 15 mins to present. Any absent group members get 0.",
+          "deadline": "2026-05-20",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": null,
+          "follow_up": null
+        },
+        {
+          "id": "ts_1713023409",
+          "title": "Submit Lab 8 materials",
+          "description": "Submit report, recorded presentation, and slides for Lab 8 in Spectrum.",
+          "deadline": "2026-05-27",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": null,
+          "follow_up": null
+        },
+        {
+          "id": "ts_1713023410",
+          "title": "Build login API",
+          "description": "Build the login API.",
+          "deadline": "2026-03-11",
+          "due_date_source": "suggested",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Sarah",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1713023411",
+          "title": "Write final report",
+          "description": "Write the final report.",
+          "deadline": "2026-03-13",
+          "due_date_source": "suggested",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Jason",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1713023412",
+          "title": "Prepare and present Lab 7",
+          "description": "Present the lab for Week 10 and demonstrate a working code that implements the algorithm. Presentation should include: Algorithm introduction (1-3 slides), Flow-chart & Pseudo-code of coding implementation, Program sample output, Code demonstration. Each group has 15 mins to present. Any absent group members get 0.",
+          "deadline": "2026-05-20",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": null,
+          "follow_up": null
+        },
+        {
+          "id": "ts_1713023413",
+          "title": "Submit Lab 7 materials",
+          "description": "Submit Presentation PowerPoint slide (ppt/pptx/pdf), Lab Report (pdf), and Coding source-code (zipped) in Spectrum.",
+          "deadline": "2026-05-20",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": null,
+          "follow_up": null
+        },
+        {
+          "id": "ts_1713023414",
+          "title": "Prepare and present Lab 8",
+          "description": "Present the lab for Week 11 and demonstrate a working code that implements the algorithm. Presentation should include: Algorithm introduction (1-3 slides), Flow-chart & Pseudo-code of coding implementation, Program sample output, Code demonstration. Each group has 15 mins to present. Any absent group members get 0.",
+          "deadline": "2026-05-27",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": null,
+          "follow_up": null
+        },
+        {
+          "id": "ts_1713023415",
+          "title": "Submit Lab 8 materials (Offline)",
+          "description": "Submit recorded presentation, Presentation PowerPoint slide (ppt/pptx/pdf), Lab Report (pdf), and Coding source-code (zipped) in Spectrum.",
+          "deadline": "2026-05-27",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": null,
+          "follow_up": null
+        },
+        {
+          "id": "ts_1713023416",
+          "title": "Ensure program input is not hard-coded",
+          "description": "For all programming assignments, ensure the input is not hard-coded and the program can accept any numbers to deliver the output.",
+          "deadline": "2026-06-21",
+          "due_date_source": "suggested",
+          "priority": "high",
+          "status": "pending",
+          "owner": null,
+          "follow_up": null
+        },
+        {
+          "id": "ts_1713023417",
+          "title": "Form groups of 7-8 students",
+          "description": "Organize students into groups of 7-8 for lab presentations and submissions.",
+          "deadline": "2026-03-23",
+          "due_date_source": "suggested",
+          "priority": "medium",
+          "status": "pending",
+          "owner": null,
+          "follow_up": "Assign group leaders"
+        },
+        {
+          "id": "ts_1776130966_0",
+          "title": "Comment your coding extensively Do not plagiarize work",
+          "description": "comment your coding extensively Do not plagiarize work blatantly, work smart Rotate presenter Wednesday 11am-1pm MM3 Lab-Schedule- OCC3 Week 4 - 01/04/2026 - Physical - Presentation Lab1 Week 5 - 8/4/2026 - Offline submission (submit report + recorded presentation+ slides in Spectrum) Presentation - Lab2 Week 6 - 15/4/2026 - Online - Presentation Lab3 Week 7 - 22/4/2026 - Online - Presentation Lab4 Week 8 - 6/5/2026 - Physical - Presentation Lab5 Week 9 - 13/5/2026 - Physical - Presentation Lab6 Week 10 - 20/5/2026 - Online - Presentation Lab7 Week 11 - 27/5/2026 - Offline submission (submit report + recorded presentation+ slides in Spectrum) - Lab8 Gentle reminder",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Tips",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776130966_1",
+          "title": "Be inform that we will start our lab presentation on Week 4 (",
+          "description": "be inform that we will start our lab presentation on Week 4 ( Wednesday, 1st April)",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": null,
+          "follow_up": "Assign owner"
+        },
+        {
+          "id": "ts_1776131277_0",
+          "title": "comment your coding extensively Do not plagiarize work...",
+          "description": "comment your coding extensively Do not plagiarize work blatantly, work smart Rotate presenter Wednesday 11am-1pm MM3 Lab-Schedule- OCC3 Week 4 - 01/04/2026 - Physical - Presentation Lab1 Week 5 - 8/4/2026 - Offline submission (submit report + recorded presentation+ slides in Spectrum) Presentation - Lab2 Week 6 - 15/4/2026 - Online - Presentation Lab3 Week 7 - 22/4/2026 - Online - Presentation Lab4 Week 8 - 6/5/2026 - Physical - Presentation Lab5 Week 9 - 13/5/2026 - Physical - Presentation Lab6 Week 10 - 20/5/2026 - Online - Presentation Lab7 Week 11 - 27/5/2026 - Offline submission (submit report + recorded presentation+ slides in Spectrum) - Lab8 Gentle reminder",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Tips",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776131277_1",
+          "title": "be inform that we will start our lab presentation on Week 4 (...",
+          "description": "be inform that we will start our lab presentation on Week 4 ( Wednesday, 1st April)",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": null,
+          "follow_up": "Assign owner"
+        },
+        {
+          "id": "ts_1776131687_0",
+          "title": "Build the login API",
+          "description": "build the login API",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Sarah",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776131687_1",
+          "title": "Write the final report",
+          "description": "write the final report",
+          "deadline": "2026-04-17",
+          "due_date_source": "suggested",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Jason",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1678396800",
+          "title": "Initialize GitHub repo and invite team members",
+          "description": "Initialize the GitHub repository for the web programming project and invite all team members.",
+          "deadline": "2026-03-22",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Sarah",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1678483200",
+          "title": "Select official project title",
+          "description": "Choose the official project title from the provided lecture options. The current leading option is 'e-commerce dashboard'.",
+          "deadline": "2026-03-22",
+          "due_date_source": "explicit",
+          "priority": "medium",
+          "status": "pending",
+          "owner": null,
+          "follow_up": "Confirm project title"
+        },
+        {
+          "id": "ts_1678569600",
+          "title": "Design database schema using MongoDB",
+          "description": "Design the database schema using MongoDB for the backend development.",
+          "deadline": "2026-03-25",
+          "due_date_source": "suggested",
+          "priority": "high",
+          "status": "pending",
+          "owner": "John",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1678656000",
+          "title": "Confirm frontend CSS framework",
+          "description": "Decide and confirm the CSS framework to be used for the frontend development.",
+          "deadline": "2026-03-22",
+          "due_date_source": "explicit",
+          "priority": "medium",
+          "status": "pending",
+          "owner": null,
+          "follow_up": null
+        },
+        {
+          "id": "ts_1678742400",
+          "title": "Prepare and submit evaluation forms",
+          "description": "Complete and submit the evaluation forms.",
+          "deadline": "2026-04-30",
+          "due_date_source": "explicit",
+          "priority": "medium",
+          "status": "pending",
+          "owner": null,
+          "follow_up": null
+        },
+        {
+          "id": "ts_1678828800",
+          "title": "Prepare and submit report and presentation slides",
+          "description": "Prepare the project report and presentation slides.",
+          "deadline": "2026-03-25",
+          "due_date_source": "suggested",
+          "priority": "medium",
+          "status": "pending",
+          "owner": null,
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776143772_0",
+          "title": "Initialize the github repo and invite everyone",
+          "description": "initialize the github repo and invite everyone",
+          "deadline": "2026-03-22",
+          "due_date_source": "explicit",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Sarah",
+          "follow_up": "Assign owner"
+        },
+        {
+          "id": "ts_1776143772_1",
+          "title": "Pick our official project title from the lectures these and",
+          "description": "pick our official project title from the lectures these and",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": null,
+          "follow_up": "Assign owner"
+        },
+        {
+          "id": "ts_1776143772_2",
+          "title": "Design the database schema we need it really",
+          "description": "design the database schema we need it really",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "so",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776143772_3",
+          "title": "Evaluation forms are",
+          "description": "evaluation forms are",
+          "deadline": "2026-04-17",
+          "due_date_source": "suggested",
+          "priority": "medium",
+          "status": "pending",
+          "owner": null,
+          "follow_up": "Assign owner"
+        }
+      ],
+      "completed_tasks": [],
+      "gaps": [
+        {
+          "issue": "The exact project title is not confirmed, only a leading option is mentioned.",
+          "suggestion": "Finalize the project title from the lecture options."
+        },
+        {
+          "issue": "The specific requirements for the 'e-commerce dashboard' are not detailed.",
+          "suggestion": "Elaborate on the features and functionalities expected for the e-commerce dashboard."
+        },
+        {
+          "issue": "The deadline for the database schema design is 'in for a perfect', which is ambiguous.",
+          "suggestion": "Clarify the exact deadline for the database schema design. Assuming 'in for a perfect' means before backend development starts, a suggested deadline of March 25th has been set."
+        },
+        {
+          "issue": "The deadline for the report and presentation slides is 'for front end', which is unclear.",
+          "suggestion": "Clarify the exact deadline for the report and presentation slides. Assuming it's related to frontend development completion, a suggested deadline of March 25th has been set."
+        },
+        {
+          "issue": "The owner for several tasks is not assigned.",
+          "suggestion": "Assign owners to tasks such as 'Select official project title', 'Confirm frontend CSS framework', and 'Prepare and submit report and presentation slides'."
+        }
+      ],
+      "cross_insights": [
+        "The project involves both frontend and backend development, requiring a database.",
+        "There are clear deliverables for each lab presentation, including reports, slides, and code.",
+        "Team collaboration is essential, with tasks like GitHub repo initialization and member invitations.",
+        "Specific technical choices like the CSS framework and database technology (MongoDB) need to be confirmed.",
+        "Deadlines are provided for some tasks, but others require clarification or suggestion."
+      ]
+    },
+    {
+      "project_name": "WIF2002 SRE",
+      "pending_tasks": [],
+      "completed_tasks": [],
+      "gaps": [],
+      "cross_insights": []
+    }
+  ]
 }
