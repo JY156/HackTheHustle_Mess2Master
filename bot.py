@@ -40,6 +40,7 @@ TRIGGERS = [
     "finish",
     "due",
     "submit",
+    "@Mess2Master_Bot"
 ]
 CHAT_STATE = {}
 CHAT_CONTEXT = {}
@@ -457,7 +458,6 @@ class InMemoryUpload:
 
     def __init__(self, filename: str, data: bytes, mimetype: str | None = None):
         self.filename = filename
-        self.mimetype = mimetype
         self.mimetype = mimetype
         self.stream = BytesIO(data)
 
