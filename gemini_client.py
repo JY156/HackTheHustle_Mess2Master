@@ -2,11 +2,14 @@ import os
 import json
 import time
 import re
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime, timezone
 from io import BytesIO
 from PyPDF2 import PdfReader
 from google import genai
 from google.genai import types
+
+
+QUOTA_STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "gemini_quota_state.json")
 
 class Mess2MasterAI:
     def __init__(self):
@@ -24,6 +27,79 @@ class Mess2MasterAI:
             "gemini-2.5-flash",
             "models/gemini-2.5-flash",
         ]
+
+    def _load_quota_state(self):
+        try:
+            if not os.path.exists(QUOTA_STATE_FILE):
+                return {}
+            with open(QUOTA_STATE_FILE, "r", encoding="utf-8") as handle:
+                data = json.load(handle)
+                return data if isinstance(data, dict) else {}
+        except Exception:
+            return {}
+
+    def _save_quota_state(self, payload: dict):
+        try:
+            os.makedirs(os.path.dirname(QUOTA_STATE_FILE), exist_ok=True)
+            with open(QUOTA_STATE_FILE, "w", encoding="utf-8") as handle:
+                json.dump(payload, handle, indent=2)
+        except Exception:
+            # Quota guard should never break the main flow.
+            pass
+
+    def _quota_cooldown_active(self):
+        state = self._load_quota_state()
+        until = float(state.get("cooldown_until", 0) or 0)
+        if until and time.time() < until:
+            return True, state
+        return False, state
+
+    def _next_utc_midnight(self):
+        now = datetime.now(timezone.utc)
+        tomorrow = (now + timedelta(days=1)).date()
+        return datetime.combine(tomorrow, datetime.min.time(), tzinfo=timezone.utc).timestamp()
+
+    def _extract_retry_seconds(self, error_text: str) -> int:
+        match = re.search(r"retry in\s+([0-9]+(?:\.[0-9]+)?)s", error_text, flags=re.IGNORECASE)
+        if match:
+            try:
+                return max(1, int(float(match.group(1))))
+            except Exception:
+                pass
+
+        match = re.search(r"'retryDelay':\s*'([0-9]+)s'", error_text, flags=re.IGNORECASE)
+        if match:
+            try:
+                return max(1, int(match.group(1)))
+            except Exception:
+                pass
+
+        return 60
+
+    def _register_quota_cooldown(self, error_text: str, model_name: str):
+        error_lower = (error_text or "").lower()
+        retry_seconds = self._extract_retry_seconds(error_text)
+
+        # Daily free-tier quota exhaustion should stop retries until the next UTC day.
+        if "generate_content_free_tier_requests" in error_lower or "generaterequestspersdayperprojectpermodel-freetier" in error_lower:
+            cooldown_until = max(time.time() + retry_seconds, self._next_utc_midnight())
+        else:
+            cooldown_until = time.time() + retry_seconds
+
+        self._save_quota_state({
+            "cooldown_until": cooldown_until,
+            "model": model_name,
+            "reason": error_text[:1000],
+            "updated_at": time.time(),
+        })
+
+    def _quota_fallback_result(self, reason: str):
+        return {
+            "guidance": self._fallback_task_guidance("Task", "medium", "TBD"),
+            "used_model": None,
+            "fallback": True,
+            "fallback_reason": reason,
+        }
 
     def _normalize_owner(self, owner):
         raw = str(owner or "").strip()
@@ -50,6 +126,15 @@ class Mess2MasterAI:
         priority = (task.get("priority") or "medium").strip().lower()
         deadline = (task.get("deadline") or task.get("due_date") or "TBD").strip()
         owner = (task.get("owner") or "Unassigned").strip()
+
+        quota_active, quota_state = self._quota_cooldown_active()
+        if quota_active:
+            return {
+                "guidance": self._fallback_task_guidance(title, priority, deadline),
+                "used_model": None,
+                "fallback": True,
+                "fallback_reason": quota_state.get("reason") or "Gemini quota cooldown active",
+            }
 
         prompt = f"""
         You are a practical student productivity coach.
@@ -94,6 +179,7 @@ class Mess2MasterAI:
                 last_error = e
                 error_text = str(e)
                 if "429" in error_text or "RESOURCE_EXHAUSTED" in error_text:
+                    self._register_quota_cooldown(error_text, model_name)
                     break
 
         fallback_text = self._fallback_task_guidance(title, priority, deadline)
@@ -163,6 +249,12 @@ class Mess2MasterAI:
             "fallback": False,
             "fallback_reason": None,
         }
+
+        quota_active, quota_state = self._quota_cooldown_active()
+        if quota_active:
+            diagnostics["fallback"] = True
+            diagnostics["fallback_reason"] = quota_state.get("reason") or "Gemini quota cooldown active"
+            return self._fallback(sem_start, notes=notes, reason=diagnostics["fallback_reason"], diagnostics=diagnostics)
         
         mime_map = {
             'pdf': 'application/pdf', 'doc': 'application/msword',
@@ -318,6 +410,7 @@ class Mess2MasterAI:
                 
                 # Stop on quota errors (don't waste retries)
                 if "429" in error_text or "RESOURCE_EXHAUSTED" in error_text or "spending cap" in error_text.lower():
+                    self._register_quota_cooldown(error_text, model_name)
                     diagnostics["used_model"] = model_name
                     return self._fallback(sem_start, notes=notes, reason=error_text, diagnostics=diagnostics)
                 # Continue to next model on 404/not found

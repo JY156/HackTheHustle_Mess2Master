@@ -126,25 +126,6 @@
       ]
     },
     {
-      "project_name": "API Documentation",
-      "pending_tasks": [
-        {
-          "id": "ts_1776050519_9403",
-          "title": "Finish API docs",
-          "description": "Need to finish API docs by Friday 5pm",
-          "deadline": "2026-04-17 17:00",
-          "priority": "high",
-          "status": "pending",
-          "owner": "Unassigned",
-          "follow_up": null
-        }
-      ],
-      "completed_tasks": [],
-      "gaps": [],
-      "sync_score": 75,
-      "cross_insights": []
-    },
-    {
       "project_name": "WIA2004 OS",
       "pending_tasks": [
         {
@@ -179,13 +160,211 @@
           "status": "pending",
           "owner": "Jason",
           "follow_up": null
+        },
+        {
+          "id": "ts_1776128806_1",
+          "title": "consist of Algorithm introduction (limit this to 1-3 slide...",
+          "description": "consist of Algorithm introduction (limit this to 1-3 slide only) Flow-chart & Pseudo-code of your coding",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Presentation",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776128806_2",
+          "title": "comment your coding extensively Do not plagiarize work...",
+          "description": "comment your coding extensively Do not plagiarize work blatantly, work smart Rotate presenter Wednesday 11am-1pm MM3 Lab-Schedule- OCC3 Week 4 - 01/04/2026 - Physical - Presentation Lab1 Week 5 - 8/4/2026 - Offline submission (submit report + recorded presentation+ slides in Spectrum) Presentation - Lab2 Week 6 - 15/4/2026 - Online - Presentation Lab3 Week 7 - 22/4/2026 - Online - Presentation Lab4 Week 8 - 6/5/2026 - Physical - Presentation Lab5 Week 9 - 13/5/2026 - Physical - Presentation Lab6 Week 10 - 20/5/2026 - Online - Presentation Lab7 Week 11 - 27/5/2026 - Offline submission (submit report + recorded presentation+ slides in Spectrum) - Lab8 Gentle reminder",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Tips",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776128806_3",
+          "title": "Start our lab presentation on Week 4 ( Wednesday, 1st April)",
+          "description": "start our lab presentation on Week 4 ( Wednesday, 1st April)",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": null,
+          "follow_up": "Assign owner"
+        },
+        {
+          "id": "ts_1776128806_4",
+          "title": "Be able to input any numbers to deliver the output",
+          "description": "be able to input any numbers to deliver the output",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Program",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776128806_5",
+          "title": "Have 15 mins to present",
+          "description": "have 15 mins to present",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Group",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776128806_0",
+          "title": "start on Week 4 (30/3/2026) onwards Every week every group...",
+          "description": "start on Week 4 (30/3/2026) onwards Every week every group will present the lab for the particular week and demonstrate a working code that",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Session",
+          "follow_up": null
         }
       ],
       "completed_tasks": [],
       "gaps": [
         {
-          "issue": "Some tasks may still miss clear assignees or due dates",
-          "suggestion": "Review and update assignees and deadlines directly in the editable task cards."
+          "issue": "1 pending task without assignee",
+          "suggestion": "Assign each task to a specific teammate to avoid ownership gaps."
+        },
+        {
+          "issue": "6 pending tasks without deadline",
+          "suggestion": "Set a clear due date so priorities and reminders stay reliable."
+        }
+      ],
+      "sync_score": 70,
+      "cross_insights": []
+    },
+    {
+      "project_name": "WIF2002 SRE",
+      "pending_tasks": [
+        {
+          "id": "ts_1776092501_0",
+          "title": "Write the final report",
+          "description": "write the final report",
+          "deadline": "2026-04-17",
+          "due_date_source": "suggested",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Jason",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776092501_1",
+          "title": "The demo slides",
+          "description": "the demo slides",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "also",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776093279_0",
+          "title": "You finish the final report",
+          "description": "you finish the final report",
+          "deadline": "2026-04-14",
+          "due_date_source": "suggested",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Sarah",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776093279_1",
+          "title": "Prepare the presentation slides",
+          "description": "prepare the presentation slides",
+          "deadline": "2026-04-20",
+          "due_date_source": "suggested",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Jason",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776129046_0",
+          "title": "start on Week 4 (30/3/2026) onwards Every week every group...",
+          "description": "start on Week 4 (30/3/2026) onwards Every week every group will present the lab for the particular week and demonstrate a working code that",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Session",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776129046_1",
+          "title": "consist of Algorithm introduction (limit this to 1-3 slide...",
+          "description": "consist of Algorithm introduction (limit this to 1-3 slide only) Flow-chart & Pseudo-code of your coding",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Presentation",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776129046_2",
+          "title": "comment your coding extensively Do not plagiarize work...",
+          "description": "comment your coding extensively Do not plagiarize work blatantly, work smart Rotate presenter Wednesday 11am-1pm MM3 Lab-Schedule- OCC3 Week 4 - 01/04/2026 - Physical - Presentation Lab1 Week 5 - 8/4/2026 - Offline submission (submit report + recorded presentation+ slides in Spectrum) Presentation - Lab2 Week 6 - 15/4/2026 - Online - Presentation Lab3 Week 7 - 22/4/2026 - Online - Presentation Lab4 Week 8 - 6/5/2026 - Physical - Presentation Lab5 Week 9 - 13/5/2026 - Physical - Presentation Lab6 Week 10 - 20/5/2026 - Online - Presentation Lab7 Week 11 - 27/5/2026 - Offline submission (submit report + recorded presentation+ slides in Spectrum) - Lab8 Gentle reminder",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Tips",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776129046_3",
+          "title": "Start our lab presentation on Week 4 ( Wednesday, 1st April)",
+          "description": "start our lab presentation on Week 4 ( Wednesday, 1st April)",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": null,
+          "follow_up": "Assign owner"
+        },
+        {
+          "id": "ts_1776129046_4",
+          "title": "Be able to input any numbers to deliver the output",
+          "description": "be able to input any numbers to deliver the output",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Program",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776129046_5",
+          "title": "Have 15 mins to present",
+          "description": "have 15 mins to present",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Group",
+          "follow_up": null
+        }
+      ],
+      "completed_tasks": [],
+      "gaps": [
+        {
+          "issue": "1 pending task without assignee",
+          "suggestion": "Assign each task to a specific teammate to avoid ownership gaps."
+        },
+        {
+          "issue": "6 pending tasks without deadline",
+          "suggestion": "Set a clear due date so priorities and reminders stay reliable."
         }
       ],
       "sync_score": 70,
@@ -270,71 +449,83 @@
           "status": "pending",
           "owner": null,
           "follow_up": "Assign owner"
-        }
-      ],
-      "completed_tasks": [],
-      "gaps": [
-        {
-          "issue": "Some tasks may still miss clear assignees or due dates",
-          "suggestion": "Review and update assignees and deadlines directly in the editable task cards."
-        }
-      ],
-      "sync_score": 70,
-      "cross_insights": []
-    },
-    {
-      "project_name": "WIF2002 SRE",
-      "pending_tasks": [
-        {
-          "id": "ts_1776092501_0",
-          "title": "Write the final report",
-          "description": "write the final report",
-          "deadline": "2026-04-17",
-          "due_date_source": "suggested",
-          "priority": "high",
-          "status": "pending",
-          "owner": "Jason",
-          "follow_up": null
         },
         {
-          "id": "ts_1776092501_1",
-          "title": "The demo slides",
-          "description": "the demo slides",
+          "id": "ts_1776129000_0",
+          "title": "start on Week 4 (30/3/2026) onwards Every week every group...",
+          "description": "start on Week 4 (30/3/2026) onwards Every week every group will present the lab for the particular week and demonstrate a working code that",
           "deadline": null,
           "due_date_source": "null",
           "priority": "medium",
           "status": "pending",
-          "owner": "also",
+          "owner": "Session",
           "follow_up": null
         },
         {
-          "id": "ts_1776093279_0",
-          "title": "You finish the final report",
-          "description": "you finish the final report",
-          "deadline": "2026-04-14",
-          "due_date_source": "suggested",
-          "priority": "high",
+          "id": "ts_1776129000_1",
+          "title": "consist of Algorithm introduction (limit this to 1-3 slide...",
+          "description": "consist of Algorithm introduction (limit this to 1-3 slide only) Flow-chart & Pseudo-code of your coding",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
           "status": "pending",
-          "owner": "Sarah",
+          "owner": "Presentation",
           "follow_up": null
         },
         {
-          "id": "ts_1776093279_1",
-          "title": "Prepare the presentation slides",
-          "description": "prepare the presentation slides",
-          "deadline": "2026-04-20",
-          "due_date_source": "suggested",
-          "priority": "high",
+          "id": "ts_1776129000_2",
+          "title": "comment your coding extensively Do not plagiarize work...",
+          "description": "comment your coding extensively Do not plagiarize work blatantly, work smart Rotate presenter Wednesday 11am-1pm MM3 Lab-Schedule- OCC3 Week 4 - 01/04/2026 - Physical - Presentation Lab1 Week 5 - 8/4/2026 - Offline submission (submit report + recorded presentation+ slides in Spectrum) Presentation - Lab2 Week 6 - 15/4/2026 - Online - Presentation Lab3 Week 7 - 22/4/2026 - Online - Presentation Lab4 Week 8 - 6/5/2026 - Physical - Presentation Lab5 Week 9 - 13/5/2026 - Physical - Presentation Lab6 Week 10 - 20/5/2026 - Online - Presentation Lab7 Week 11 - 27/5/2026 - Offline submission (submit report + recorded presentation+ slides in Spectrum) - Lab8 Gentle reminder",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
           "status": "pending",
-          "owner": "Jason",
+          "owner": "Tips",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776129000_3",
+          "title": "Start our lab presentation on Week 4 ( Wednesday, 1st April)",
+          "description": "start our lab presentation on Week 4 ( Wednesday, 1st April)",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": null,
+          "follow_up": "Assign owner"
+        },
+        {
+          "id": "ts_1776129000_4",
+          "title": "Be able to input any numbers to deliver the output",
+          "description": "be able to input any numbers to deliver the output",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Program",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776129000_5",
+          "title": "Have 15 mins to present",
+          "description": "have 15 mins to present",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Group",
           "follow_up": null
         }
       ],
       "completed_tasks": [],
       "gaps": [
         {
-          "issue": "Some tasks may still miss clear assignees or due dates",
-          "suggestion": "Review and update assignees and deadlines directly in the editable task cards."
+          "issue": "1 pending task without assignee",
+          "suggestion": "Assign each task to a specific teammate to avoid ownership gaps."
+        },
+        {
+          "issue": "6 pending tasks without deadline",
+          "suggestion": "Set a clear due date so priorities and reminders stay reliable."
         }
       ],
       "sync_score": 70,
@@ -364,13 +555,177 @@
           "status": "pending",
           "owner": "Jason",
           "follow_up": null
+        },
+        {
+          "id": "ts_1776129082_0",
+          "title": "start on Week 4 (30/3/2026) onwards Every week every group...",
+          "description": "start on Week 4 (30/3/2026) onwards Every week every group will present the lab for the particular week and demonstrate a working code that",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Session",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776129082_1",
+          "title": "consist of Algorithm introduction (limit this to 1-3 slide...",
+          "description": "consist of Algorithm introduction (limit this to 1-3 slide only) Flow-chart & Pseudo-code of your coding",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Presentation",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776129082_2",
+          "title": "comment your coding extensively Do not plagiarize work...",
+          "description": "comment your coding extensively Do not plagiarize work blatantly, work smart Rotate presenter Wednesday 11am-1pm MM3 Lab-Schedule- OCC3 Week 4 - 01/04/2026 - Physical - Presentation Lab1 Week 5 - 8/4/2026 - Offline submission (submit report + recorded presentation+ slides in Spectrum) Presentation - Lab2 Week 6 - 15/4/2026 - Online - Presentation Lab3 Week 7 - 22/4/2026 - Online - Presentation Lab4 Week 8 - 6/5/2026 - Physical - Presentation Lab5 Week 9 - 13/5/2026 - Physical - Presentation Lab6 Week 10 - 20/5/2026 - Online - Presentation Lab7 Week 11 - 27/5/2026 - Offline submission (submit report + recorded presentation+ slides in Spectrum) - Lab8 Gentle reminder",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Tips",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776129082_3",
+          "title": "Start our lab presentation on Week 4 ( Wednesday, 1st April)",
+          "description": "start our lab presentation on Week 4 ( Wednesday, 1st April)",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": null,
+          "follow_up": "Assign owner"
+        },
+        {
+          "id": "ts_1776129082_4",
+          "title": "Be able to input any numbers to deliver the output",
+          "description": "be able to input any numbers to deliver the output",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Program",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776129082_5",
+          "title": "Have 15 mins to present",
+          "description": "have 15 mins to present",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Group",
+          "follow_up": null
         }
       ],
       "completed_tasks": [],
       "gaps": [
         {
-          "issue": "Some tasks may still miss clear assignees or due dates",
-          "suggestion": "Review and update assignees and deadlines directly in the editable task cards."
+          "issue": "1 pending task without assignee",
+          "suggestion": "Assign each task to a specific teammate to avoid ownership gaps."
+        },
+        {
+          "issue": "6 pending tasks without deadline",
+          "suggestion": "Set a clear due date so priorities and reminders stay reliable."
+        }
+      ],
+      "sync_score": 70,
+      "cross_insights": []
+    },
+    {
+      "project_name": "API Documentation",
+      "pending_tasks": [
+        {
+          "id": "ts_1776050519_9403",
+          "title": "Finish API docs",
+          "description": "Need to finish API docs by Friday 5pm",
+          "deadline": "2026-04-17 17:00",
+          "priority": "high",
+          "status": "pending",
+          "owner": "Unassigned",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776129092_0",
+          "title": "start on Week 4 (30/3/2026) onwards Every week every group...",
+          "description": "start on Week 4 (30/3/2026) onwards Every week every group will present the lab for the particular week and demonstrate a working code that",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Session",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776129092_1",
+          "title": "consist of Algorithm introduction (limit this to 1-3 slide...",
+          "description": "consist of Algorithm introduction (limit this to 1-3 slide only) Flow-chart & Pseudo-code of your coding",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Presentation",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776129092_2",
+          "title": "comment your coding extensively Do not plagiarize work...",
+          "description": "comment your coding extensively Do not plagiarize work blatantly, work smart Rotate presenter Wednesday 11am-1pm MM3 Lab-Schedule- OCC3 Week 4 - 01/04/2026 - Physical - Presentation Lab1 Week 5 - 8/4/2026 - Offline submission (submit report + recorded presentation+ slides in Spectrum) Presentation - Lab2 Week 6 - 15/4/2026 - Online - Presentation Lab3 Week 7 - 22/4/2026 - Online - Presentation Lab4 Week 8 - 6/5/2026 - Physical - Presentation Lab5 Week 9 - 13/5/2026 - Physical - Presentation Lab6 Week 10 - 20/5/2026 - Online - Presentation Lab7 Week 11 - 27/5/2026 - Offline submission (submit report + recorded presentation+ slides in Spectrum) - Lab8 Gentle reminder",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Tips",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776129092_3",
+          "title": "Start our lab presentation on Week 4 ( Wednesday, 1st April)",
+          "description": "start our lab presentation on Week 4 ( Wednesday, 1st April)",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": null,
+          "follow_up": "Assign owner"
+        },
+        {
+          "id": "ts_1776129092_4",
+          "title": "Be able to input any numbers to deliver the output",
+          "description": "be able to input any numbers to deliver the output",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Program",
+          "follow_up": null
+        },
+        {
+          "id": "ts_1776129092_5",
+          "title": "Have 15 mins to present",
+          "description": "have 15 mins to present",
+          "deadline": null,
+          "due_date_source": "null",
+          "priority": "medium",
+          "status": "pending",
+          "owner": "Group",
+          "follow_up": null
+        }
+      ],
+      "completed_tasks": [],
+      "gaps": [
+        {
+          "issue": "1 pending task without assignee",
+          "suggestion": "Assign each task to a specific teammate to avoid ownership gaps."
+        },
+        {
+          "issue": "6 pending tasks without deadline",
+          "suggestion": "Set a clear due date so priorities and reminders stay reliable."
         }
       ],
       "sync_score": 70,
