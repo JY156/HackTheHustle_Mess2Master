@@ -43,6 +43,9 @@ TRIGGERS = [
 ]
 CHAT_STATE = {}
 CHAT_CONTEXT = {}
+CONTEXT_WINDOW_SIZE = int(os.getenv("CONTEXT_WINDOW_SIZE", "15"))
+CONTEXT_LINE_MAX_CHARS = int(os.getenv("CONTEXT_LINE_MAX_CHARS", "120"))
+CONTEXT_TOTAL_MAX_CHARS = int(os.getenv("CONTEXT_TOTAL_MAX_CHARS", "1800"))
 CONFIDENCE_THRESHOLD = 0.65
 STRONG_SIGNAL_WORDS = ["due", "by", "friday", "monday", "assign", "need to", "finish", "submit"]
 TASK_SPLIT_RE = re.compile(r"\s+(?:and also|also|and then|plus|,\s+and|;|\.|\n)\s+", re.I)
@@ -378,7 +381,7 @@ def resolve_assignee(name: str) -> str:
 
 def get_context_buffer(chat_id: int):
     if chat_id not in CHAT_CONTEXT:
-        CHAT_CONTEXT[chat_id] = deque(maxlen=10)
+        CHAT_CONTEXT[chat_id] = deque(maxlen=CONTEXT_WINDOW_SIZE)
     return CHAT_CONTEXT[chat_id]
 
 
@@ -387,6 +390,77 @@ def add_context_message(chat_id: int, sender: str, text: str):
     compact = shorten_text(text, 220)
     if compact:
         buffer.append({"sender": sender or "unknown", "text": compact})
+
+
+def get_message_sender(message) -> str:
+    user = message.from_user if message else None
+    if not user:
+        return "unknown"
+    if user.username:
+        return f"@{user.username}"
+
+    full_name = " ".join(part for part in [user.first_name, user.last_name] if part).strip()
+    return full_name or "unknown"
+
+
+def message_mentions_bot(message, bot_username: str | None) -> bool:
+    if not message or not bot_username:
+        return False
+
+    def matches(text: str | None, entities) -> bool:
+        content = text or ""
+        if not content:
+            return False
+
+        for entity in entities or []:
+            if getattr(entity, "type", "") != "mention":
+                continue
+            start = int(getattr(entity, "offset", 0))
+            end = start + int(getattr(entity, "length", 0))
+            token = content[start:end].strip().lower()
+            if token.startswith("@") and token == f"@{bot_username.lower()}":
+                return True
+
+        return f"@{bot_username.lower()}" in content.lower()
+
+    return matches(message.text, message.entities) or matches(message.caption, getattr(message, "caption_entities", None))
+
+
+def build_rolling_context_notes(chat_id: int, current_sender: str, current_text: str, window_size: int = 15) -> str:
+    entries = list(get_context_buffer(chat_id)) if chat_id else []
+    if entries and entries[-1].get("sender") == current_sender and entries[-1].get("text") == shorten_text(current_text, 220):
+        entries = entries[:-1]
+
+    recent = entries[-max(1, window_size):]
+    if not recent:
+        return current_text
+
+    context_lines = []
+    total_chars = 0
+    for entry in reversed(recent):
+        sender = entry.get("sender") or "unknown"
+        text = shorten_text(entry.get("text") or "", CONTEXT_LINE_MAX_CHARS)
+        if not text:
+            continue
+        line = f"{sender}: {text}"
+        if total_chars + len(line) > CONTEXT_TOTAL_MAX_CHARS:
+            break
+        context_lines.append(line)
+        total_chars += len(line)
+
+    context_lines.reverse()
+    if not context_lines:
+        return current_text
+
+    context_block = "\n".join(context_lines)
+    return (
+        "Use this rolling group context before the current message. "
+        "Prioritize concrete deadlines/owners and ignore small talk.\n\n"
+        f"[Recent Group Context - last {len(context_lines)} messages]\n"
+        f"{context_block}\n\n"
+        "[Current Message]\n"
+        f"{current_text}"
+    )
 
 
 def infer_topic_from_context(context_buffer: list[dict], current_text: str) -> str | None:
@@ -1033,9 +1107,14 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_type = (update.effective_chat.type if update.effective_chat else "private").lower()
     is_group_chat = chat_type in {"group", "supergroup"}
     chat_id = update.effective_chat.id if update.effective_chat else None
-    sender_name = message.from_user.username if message.from_user and message.from_user.username else "unknown"
+    sender_name = get_message_sender(message)
+    bot_username = context.bot.username if context and context.bot else None
+    mention_triggered = message_mentions_bot(message, bot_username)
     if chat_id:
         add_context_message(chat_id, sender_name, notes)
+
+    if is_group_chat and not mention_triggered:
+        return
 
     # Follow-up mode: interpret normal replies as updates to the latest task card.
     state = CHAT_STATE.get(chat_id) if chat_id else None
@@ -1061,33 +1140,27 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if is_group_chat:
-        lowered = notes.lower()
-        if not any(word in lowered for word in TRIGGERS):
-            return
+        ai_notes = build_rolling_context_notes(chat_id, sender_name, notes, window_size=CONTEXT_WINDOW_SIZE)
+    else:
+        ai_notes = notes
     default_owner = "Unassigned" if is_group_chat else (f"@{message.from_user.username}" if message.from_user and message.from_user.username else "Unassigned")
     if chat_id and message.message_id:
         await set_reaction_safe(context, chat_id, message.message_id, "🧐")
 
     try:
-        result = await build_ai_result(notes=notes, uploads=[])
+        result = await build_ai_result(notes=ai_notes, uploads=[])
         context_buffer = list(get_context_buffer(chat_id)) if chat_id else []
-        local_tasks = extract_tasks_from_message(notes, default_owner, context_buffer=context_buffer)
-
-        if local_tasks:
-            attach_assignee_suggestions(local_tasks, context_buffer)
-            result["tasks"] = local_tasks
-            result["project_name"] = result.get("project_name") or simplify_task_title(notes)
-        elif result.get("tasks"):
-            inferred_title = simplify_task_title(notes)
-            inferred_due = infer_due_date(notes)
-            inferred_time = infer_due_time(notes)
-            for task in result["tasks"][:3]:
-                if inferred_title:
-                    task["title"] = inferred_title
-                if inferred_due:
-                    task["due_date"] = f"{inferred_due} {inferred_time}" if inferred_time else inferred_due
-                task["owner"] = task.get("owner") or default_owner
+        if result.get("tasks"):
+            for task in result["tasks"]:
+                if not task.get("owner"):
+                    task["owner"] = "Unassigned"
+                due_value = task.get("deadline") or task.get("due_date")
+                task["deadline"] = due_value or None
+                task["due_date"] = due_value or None
+                if not task.get("due_date_source"):
+                    task["due_date_source"] = "explicit" if due_value else "null"
             attach_assignee_suggestions(result["tasks"], context_buffer)
+            result["project_name"] = result.get("project_name") or simplify_task_title(notes)
 
         if chat_id and message.message_id:
             await set_reaction_safe(context, chat_id, message.message_id, "✅")
@@ -1096,8 +1169,12 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             confidence = estimate_confidence(result, notes)
             tasks = result.get("tasks", [])
             if not tasks:
+                if mention_triggered:
+                    await message.reply_text(
+                        "I couldn't extract structured tasks from that mention. Try adding a clear action, owner, or deadline."
+                    )
                 return
-            if confidence < CONFIDENCE_THRESHOLD and not has_strong_signal(notes):
+            if not mention_triggered and confidence < CONFIDENCE_THRESHOLD and not has_strong_signal(notes):
                 return
 
             key = "|".join(sorted(task_key(task) for task in tasks))
@@ -1136,8 +1213,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             }
             return
 
-        if local_tasks:
-            result["tasks"] = local_tasks
         await message.reply_text(format_private_response(result), parse_mode=ParseMode.HTML)
     except Exception as e:
         await message.reply_text(f"Sync error: {e}")
@@ -1146,6 +1221,12 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.effective_message
     if not message or not message.document:
+        return
+
+    chat_type = (update.effective_chat.type if update.effective_chat else "private").lower()
+    is_group_chat = chat_type in {"group", "supergroup"}
+    bot_username = context.bot.username if context and context.bot else None
+    if is_group_chat and not message_mentions_bot(message, bot_username):
         return
 
     await message.reply_text("Reading your file...")
@@ -1166,19 +1247,6 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         notes = message.caption or ""
 
         result = await build_ai_result(notes=notes, uploads=[upload])
-        if notes:
-            local_tasks = extract_tasks_from_message(notes, "Unassigned")
-            if local_tasks:
-                result["tasks"] = local_tasks
-            elif result.get("tasks"):
-                inferred_title = simplify_task_title(notes)
-                inferred_due = infer_due_date(notes)
-                inferred_time = infer_due_time(notes)
-                for task in result["tasks"][:3]:
-                    if inferred_title:
-                        task["title"] = inferred_title
-                    if inferred_due:
-                        task["due_date"] = f"{inferred_due} {inferred_time}" if inferred_time else inferred_due
         await message.reply_text(format_private_response(result), parse_mode=ParseMode.HTML)
     except Exception as e:
         await message.reply_text(f"File processing error: {e}")
